@@ -13,17 +13,22 @@ const SMAP = {
 };
 const BRANDS = ["Samsung","iPhone","Xiaomi","OPPO","Vivo","Realme","Huawei","Infinix","POCO","OnePlus","Lainnya"];
 const DAMAGES = ["LCD Pecah","Baterai Drop","Mati Total","Charging Error","Speaker Rusak","Kamera Error","Software/Hang","Water Damage","Tombol Rusak","Sinyal Hilang","Lainnya"];
+const COLORS = ["Hitam","Putih","Biru","Hijau","Merah","Gold","Silver","Ungu","Pink","Lainnya"];
+const KONDISI = ["Mulus","Lecet Ringan","Lecet Berat","Retak","Penyok"];
+const KELENGKAPAN = ["Charger","Kabel Data","Dus/Box","SIM Card","Memory Card","Case/Casing","Screen Guard"];
+const PRIORITAS = [{v:"Normal",e:"🟢",c:"#10B981"},{v:"Urgent",e:"🟡",c:"#F59E0B"},{v:"Express",e:"🔴",c:"#EF4444"}];
+const TEKNISI_LIST = ["Pak Budi","Pak Eko","Pak Andi","Pak Reza","Bu Sari"];
 const fmt = function(d) { return d ? new Date(d).toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}) : "-"; };
 const rp = function(n) { return (n || n === 0) ? "Rp " + Number(n).toLocaleString("id-ID") : "-"; };
 const today = function() { return new Date().toISOString().split("T")[0]; };
 
 const DEMO = [
-  {id:"SRV001",namaCustomer:"Ahmad Fadli",noHP:"081234567890",merkHP:"Samsung",tipeHP:"Galaxy A54",kerusakan:"LCD Pecah",keluhan:"Layar retak setelah jatuh dari meja",status:"Proses",biayaEstimasi:450000,uangMuka:200000,teknisi:"Pak Budi",tanggalMasuk:"2026-04-08",catatan:"Sparepart sudah dipesan"},
-  {id:"SRV002",namaCustomer:"Siti Rahma",noHP:"085678901234",merkHP:"iPhone",tipeHP:"iPhone 13",kerusakan:"Baterai Drop",keluhan:"Baterai cepat habis, health 72%",status:"Selesai",biayaEstimasi:600000,uangMuka:300000,teknisi:"Pak Eko",tanggalMasuk:"2026-04-07",catatan:"Baterai original Apple"},
-  {id:"SRV003",namaCustomer:"Budi Santoso",noHP:"087890123456",merkHP:"Xiaomi",tipeHP:"Redmi Note 12",kerusakan:"Mati Total",keluhan:"HP mati setelah kena air hujan",status:"Diagnosa",biayaEstimasi:0,uangMuka:50000,teknisi:"Pak Andi",tanggalMasuk:"2026-04-09",catatan:"Perlu cek mesin & IC power"},
-  {id:"SRV004",namaCustomer:"Dewi Putri",noHP:"089012345678",merkHP:"OPPO",tipeHP:"Reno 10",kerusakan:"Charging Error",keluhan:"Port charging longgar, kadang konek kadang tidak",status:"Diterima",biayaEstimasi:150000,uangMuka:0,teknisi:"",tanggalMasuk:"2026-04-10",catatan:""},
-  {id:"SRV005",namaCustomer:"Rudi Hartono",noHP:"081345678901",merkHP:"Vivo",tipeHP:"V29",kerusakan:"Kamera Error",keluhan:"Kamera belakang blur & tidak bisa fokus",status:"Proses",biayaEstimasi:350000,uangMuka:150000,teknisi:"Pak Budi",tanggalMasuk:"2026-04-06",catatan:"Modul kamera perlu diganti"},
-  {id:"SRV006",namaCustomer:"Aisyah Nur",noHP:"082567890123",merkHP:"Samsung",tipeHP:"Galaxy S23",kerusakan:"Software/Hang",keluhan:"HP sering restart sendiri & lag",status:"Selesai",biayaEstimasi:200000,uangMuka:100000,teknisi:"Pak Eko",tanggalMasuk:"2026-04-05",catatan:"Factory reset + update firmware"},
+  {id:"SRV001",namaCustomer:"Ahmad Fadli",noHP:"081234567890",alamat:"Jl. Melati No.12, Ciputat",merkHP:"Samsung",tipeHP:"Galaxy A54",warnaHP:"Hitam",imei:"354678091234567",kondisi:"Lecet Ringan",kelengkapan:"Charger,Kabel Data",kerusakan:"LCD Pecah",keluhan:"Layar retak setelah jatuh dari meja",prioritas:"Urgent",status:"Proses",biayaEstimasi:450000,uangMuka:200000,teknisi:"Pak Budi",passwordHP:"1234",garansi:"Tidak",tglEstSelesai:"2026-04-12",tanggalMasuk:"2026-04-08",catatan:"Sparepart sudah dipesan"},
+  {id:"SRV002",namaCustomer:"Siti Rahma",noHP:"085678901234",alamat:"Jl. Kenanga No.5, Pamulang",merkHP:"iPhone",tipeHP:"iPhone 13",warnaHP:"Putih",imei:"490154203237518",kondisi:"Mulus",kelengkapan:"Charger,Dus/Box,Case/Casing",kerusakan:"Baterai Drop",keluhan:"Baterai cepat habis, health 72%",prioritas:"Normal",status:"Selesai",biayaEstimasi:600000,uangMuka:300000,teknisi:"Pak Eko",passwordHP:"Face ID",garansi:"Ya",tglEstSelesai:"2026-04-10",tanggalMasuk:"2026-04-07",catatan:"Baterai original Apple"},
+  {id:"SRV003",namaCustomer:"Budi Santoso",noHP:"087890123456",alamat:"Jl. Dahlia No.8, Serpong",merkHP:"Xiaomi",tipeHP:"Redmi Note 12",warnaHP:"Biru",imei:"",kondisi:"Lecet Berat",kelengkapan:"Charger",kerusakan:"Mati Total",keluhan:"HP mati setelah kena air hujan",prioritas:"Express",status:"Diagnosa",biayaEstimasi:0,uangMuka:50000,teknisi:"Pak Andi",passwordHP:"Pola",garansi:"Tidak",tglEstSelesai:"",tanggalMasuk:"2026-04-09",catatan:"Perlu cek mesin & IC power"},
+  {id:"SRV004",namaCustomer:"Dewi Putri",noHP:"089012345678",alamat:"Jl. Anggrek No.3, BSD",merkHP:"OPPO",tipeHP:"Reno 10",warnaHP:"Gold",imei:"867530012345678",kondisi:"Mulus",kelengkapan:"Charger,SIM Card",kerusakan:"Charging Error",keluhan:"Port charging longgar, kadang konek kadang tidak",prioritas:"Normal",status:"Diterima",biayaEstimasi:150000,uangMuka:0,teknisi:"",passwordHP:"",garansi:"Ya",tglEstSelesai:"2026-04-14",tanggalMasuk:"2026-04-10",catatan:""},
+  {id:"SRV005",namaCustomer:"Rudi Hartono",noHP:"081345678901",alamat:"Jl. Mawar No.20, Pondok Aren",merkHP:"Vivo",tipeHP:"V29",warnaHP:"Ungu",imei:"",kondisi:"Lecet Ringan",kelengkapan:"Charger,Case/Casing",kerusakan:"Kamera Error",keluhan:"Kamera belakang blur & tidak bisa fokus",prioritas:"Urgent",status:"Proses",biayaEstimasi:350000,uangMuka:150000,teknisi:"Pak Budi",passwordHP:"5678",garansi:"Tidak",tglEstSelesai:"2026-04-11",tanggalMasuk:"2026-04-06",catatan:"Modul kamera perlu diganti"},
+  {id:"SRV006",namaCustomer:"Aisyah Nur",noHP:"082567890123",alamat:"Jl. Flamboyan No.15, Ciputat Timur",merkHP:"Samsung",tipeHP:"Galaxy S23",warnaHP:"Hijau",imei:"352789041234567",kondisi:"Mulus",kelengkapan:"Charger,Kabel Data,Dus/Box,Screen Guard",kerusakan:"Software/Hang",keluhan:"HP sering restart sendiri & lag",prioritas:"Normal",status:"Selesai",biayaEstimasi:200000,uangMuka:100000,teknisi:"Pak Eko",passwordHP:"Pattern",garansi:"Ya",tglEstSelesai:"2026-04-08",tanggalMasuk:"2026-04-05",catatan:"Factory reset + update firmware"},
 ];
 
 const CSS_TEXT = `
@@ -124,10 +129,10 @@ function Modal({title, msg, onOk, onNo, okText, danger}) {
 function Nota({item, onClose}) {
   var sisa = (Number(item.biayaEstimasi) || 0) - (Number(item.uangMuka) || 0);
   function sendWA() {
-    var t = "📋 *NOTA SERVICE*\n━━━━━━━━━━━━\nID: " + item.id + "\nCustomer: " + item.namaCustomer + "\nHP: " + item.merkHP + " " + (item.tipeHP||"") + "\nKerusakan: " + item.kerusakan + "\nStatus: " + item.status + "\nEstimasi: " + rp(item.biayaEstimasi) + "\nDP: " + rp(item.uangMuka) + "\nSisa: " + rp(sisa) + "\n━━━━━━━━━━━━\n_ServiceKu Phone Center_";
+    var t = "📋 *NOTA SERVICE*\n━━━━━━━━━━━━\nID: " + item.id + "\nCustomer: " + item.namaCustomer + "\nHP: " + item.merkHP + " " + (item.tipeHP||"") + "\nWarna: " + (item.warnaHP||"-") + "\nIMEI: " + (item.imei||"-") + "\nKondisi: " + (item.kondisi||"-") + "\nKelengkapan: " + (item.kelengkapan||"-") + "\nKerusakan: " + item.kerusakan + "\nPrioritas: " + (item.prioritas||"Normal") + "\nStatus: " + item.status + "\nTeknisi: " + (item.teknisi||"-") + "\nEstimasi: " + rp(item.biayaEstimasi) + "\nDP: " + rp(item.uangMuka) + "\nSisa: " + rp(sisa) + "\n━━━━━━━━━━━━\n_ServiceKu Phone Center_";
     window.open("https://wa.me/" + (item.noHP || "").replace(/^0/,"62") + "?text=" + encodeURIComponent(t), "_blank");
   }
-  var rows = [["Customer",item.namaCustomer],["No. HP",item.noHP],["Perangkat",item.merkHP + " " + (item.tipeHP||"")],["Kerusakan",item.kerusakan],["Keluhan",item.keluhan],["Teknisi",item.teknisi||"-"],["Status",item.status]];
+  var rows = [["Customer",item.namaCustomer],["No. HP",item.noHP],["Alamat",item.alamat],["Perangkat",item.merkHP + " " + (item.tipeHP||"")],["Warna",item.warnaHP],["IMEI/SN",item.imei],["Kondisi",item.kondisi],["Kelengkapan",item.kelengkapan],["Kerusakan",item.kerusakan],["Prioritas",item.prioritas],["Teknisi",item.teknisi||"-"],["Status",item.status]];
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(4px)"}}>
       <div style={{background:"#fff",borderRadius:20,width:"100%",maxWidth:380,maxHeight:"85vh",overflow:"auto",animation:"scaleIn .25s ease"}}>
@@ -142,7 +147,7 @@ function Nota({item, onClose}) {
           </div>
           {rows.map(function(r, i) {
             return (
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:i < 6 ? "1px solid #F1F5F9" : "none",gap:12}}>
+              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:i < rows.length - 1 ? "1px solid #F1F5F9" : "none",gap:12}}>
                 <span style={{fontSize:13,color:"#94A3B8",flexShrink:0}}>{r[0]}</span>
                 <span style={{fontSize:13,fontWeight:600,color:"#0F172A",textAlign:"right"}}>{r[1] || "-"}</span>
               </div>
@@ -198,7 +203,7 @@ export default function App() {
   var [modal, setModal] = useState(null);
   var [nota, setNota] = useState(null);
   var [step, setStep] = useState(0);
-  var [fd, setFd] = useState({namaCustomer:"",noHP:"",merkHP:"",tipeHP:"",kerusakan:"",keluhan:"",biayaEstimasi:"",uangMuka:"",teknisi:"",catatan:""});
+  var [fd, setFd] = useState({namaCustomer:"",noHP:"",alamat:"",merkHP:"",tipeHP:"",warnaHP:"",imei:"",kondisi:"",kelengkapan:[],kerusakan:"",keluhan:"",prioritas:"Normal",biayaEstimasi:"",uangMuka:"",teknisi:"",passwordHP:"",garansi:"",tglEstSelesai:"",catatan:""});
   var [errs, setErrs] = useState({});
 
   useEffect(function() { var t = setTimeout(function() { setSplash(false); }, 2200); return function() { clearTimeout(t); }; }, []);
@@ -236,14 +241,16 @@ export default function App() {
   function validate(s) {
     var e = {};
     if (s===0) { if(!fd.namaCustomer.trim()) e.namaCustomer="Wajib"; if(!fd.noHP.trim()) e.noHP="Wajib"; else if(!/^08\d{8,12}$/.test(fd.noHP.trim())) e.noHP="Format: 08xxx"; }
-    if (s===1) { if(!fd.merkHP) e.merkHP="Pilih merk"; if(!fd.kerusakan) e.kerusakan="Pilih kerusakan"; }
+    if (s===1) { if(!fd.merkHP) e.merkHP="Pilih merk"; }
+    if (s===2) { if(!fd.kerusakan) e.kerusakan="Pilih kerusakan"; }
     setErrs(e); return Object.keys(e).length===0;
   }
 
   function submitForm() {
-    if (!validate(2)) return;
+    if (!validate(3)) return;
     setLoading(true);
-    var payload = Object.assign({}, fd, {action:"tambah",status:"Diterima",tanggalMasuk:today()});
+    var sendFd = Object.assign({}, fd, {kelengkapan: (fd.kelengkapan||[]).join(",")});
+    var payload = Object.assign({}, sendFd, {action:"tambah",status:"Diterima",tanggalMasuk:today()});
     var body = Object.keys(payload).map(function(k){return k+"="+encodeURIComponent(payload[k]);}).join("&");
     fetch(API, {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:body}).then(function() {
       flash("Service order berhasil! 🎉");
@@ -252,7 +259,7 @@ export default function App() {
       setData(function(p){return [ni].concat(p);});
       flash("Tersimpan (offline) 📱");
     }).finally(function() {
-      setFd({namaCustomer:"",noHP:"",merkHP:"",tipeHP:"",kerusakan:"",keluhan:"",biayaEstimasi:"",uangMuka:"",teknisi:"",catatan:""});
+      setFd({namaCustomer:"",noHP:"",alamat:"",merkHP:"",tipeHP:"",warnaHP:"",imei:"",kondisi:"",kelengkapan:[],kerusakan:"",keluhan:"",prioritas:"Normal",biayaEstimasi:"",uangMuka:"",teknisi:"",passwordHP:"",garansi:"",tglEstSelesai:"",catatan:""});
       setStep(0); setPage("home"); setTab("home"); setLoading(false); fetchData(true);
     });
   }
@@ -293,7 +300,7 @@ export default function App() {
   // ═══ DETAIL ═══
   if (page==="detail" && sel) {
     var ci = SFLOW.indexOf(sel.status);
-    var ns = ci >= 0 && ci < SFLOW.length-1 ? SFLOW[ci+1] : null;
+    var ns = ci < SFLOW.length-1 ? SFLOW[ci+1] : null;
     var sisa = (Number(sel.biayaEstimasi)||0) - (Number(sel.uangMuka)||0);
     return (
       <div style={base}>
@@ -324,14 +331,15 @@ export default function App() {
               <div>
                 <div style={{fontSize:18,fontWeight:800,color:T.text}}>{sel.namaCustomer}</div>
                 <div style={{fontSize:14,color:T.ts,marginTop:2}}>{sel.noHP}</div>
+                {sel.alamat && <div style={{fontSize:13,color:T.tm,marginTop:4,lineHeight:1.4}}>📍 {sel.alamat}</div>}
               </div>
             </div>
           </div>
           {/* Device */}
           <div style={{background:T.card,borderRadius:18,padding:20,marginBottom:12,border:"1px solid "+T.cb,animation:"fadeSlide .3s ease .1s both"}}>
             <div style={{fontSize:11,color:T.tm,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:12}}>📱 Perangkat</div>
-            {[["Merk & Tipe",sel.merkHP+" "+(sel.tipeHP||"")],["Kerusakan",sel.kerusakan,"#EF4444"],["Keluhan",sel.keluhan||"-"]].map(function(r,i){
-              return <div key={i} style={{padding:"10px 0",borderBottom:i<2?"1px solid "+T.dv:"none"}}><div style={{fontSize:11,color:T.tm,fontWeight:700,marginBottom:3}}>{r[0]}</div><div style={{fontSize:15,fontWeight:600,color:r[2]||T.text,lineHeight:1.5}}>{r[1]}</div></div>;
+            {[["Merk & Tipe",sel.merkHP+" "+(sel.tipeHP||"")],["Warna",sel.warnaHP||"-"],["IMEI/SN",sel.imei||"-"],["Kondisi Fisik",sel.kondisi||"-"],["Kelengkapan",sel.kelengkapan||"-"],["Kerusakan",sel.kerusakan,"#EF4444"],["Keluhan",sel.keluhan||"-"],["Prioritas",(sel.prioritas||"Normal")],["Garansi",sel.garansi||"-"]].map(function(r,i){
+              return <div key={i} style={{padding:"10px 0",borderBottom:i<8?"1px solid "+T.dv:"none"}}><div style={{fontSize:11,color:T.tm,fontWeight:700,marginBottom:3}}>{r[0]}</div><div style={{fontSize:15,fontWeight:600,color:r[2]||T.text,lineHeight:1.5}}>{r[1]}</div></div>;
             })}
           </div>
           {/* Finance */}
@@ -343,8 +351,8 @@ export default function App() {
           {/* Service Info */}
           <div style={{background:T.card,borderRadius:18,padding:20,marginBottom:16,border:"1px solid "+T.cb,animation:"fadeSlide .3s ease .2s both"}}>
             <div style={{fontSize:11,color:T.tm,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:12}}>🔧 Service Info</div>
-            {[["Teknisi",sel.teknisi||"Belum ditentukan"],["Catatan",sel.catatan||"Tidak ada catatan"]].map(function(r,i){
-              return <div key={i} style={{padding:"10px 0",borderBottom:i===0?"1px solid "+T.dv:"none"}}><div style={{fontSize:11,color:T.tm,fontWeight:700,marginBottom:3}}>{r[0]}</div><div style={{fontSize:15,fontWeight:600,color:T.text,lineHeight:1.5}}>{r[1]}</div></div>;
+            {[["Teknisi",sel.teknisi||"Belum ditentukan"],["Est. Selesai",sel.tglEstSelesai?fmt(sel.tglEstSelesai):"Belum ditentukan"],["Password/Pola","🔒 "+(sel.passwordHP||"Tidak ada")],["Catatan",sel.catatan||"Tidak ada catatan"]].map(function(r,i){
+              return <div key={i} style={{padding:"10px 0",borderBottom:i<3?"1px solid "+T.dv:"none"}}><div style={{fontSize:11,color:T.tm,fontWeight:700,marginBottom:3}}>{r[0]}</div><div style={{fontSize:15,fontWeight:600,color:T.text,lineHeight:1.5}}>{r[1]}</div></div>;
             })}
           </div>
           {/* Actions */}
@@ -362,7 +370,7 @@ export default function App() {
 
   // ═══ FORM ═══
   if (page==="form") {
-    var stps = ["Customer","Perangkat","Biaya"];
+    var stps = ["Customer","Perangkat","Kerusakan","Biaya"];
     return (
       <div style={base}>
         <style>{CSS_TEXT}</style>
@@ -389,6 +397,10 @@ export default function App() {
               <input style={inp("noHP")} placeholder="08xxxxxxxxxx" type="tel" value={fd.noHP} onChange={function(e){setFd(function(p){return Object.assign({},p,{noHP:e.target.value});});}}/>
               {errs.noHP && <div style={{fontSize:12,color:"#EF4444",marginTop:6,fontWeight:600}}>⚠️ {errs.noHP}</div>}
             </div>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Alamat</label>
+              <textarea style={Object.assign({},inp(""),{minHeight:70,resize:"vertical"})} placeholder="Alamat lengkap customer..." value={fd.alamat} onChange={function(e){setFd(function(p){return Object.assign({},p,{alamat:e.target.value});});}}/>
+            </div>
           </div>}
 
           {step===1 && <div style={{animation:"scaleIn .25s ease"}}>
@@ -401,10 +413,47 @@ export default function App() {
               </div>
               {errs.merkHP && <div style={{fontSize:12,color:"#EF4444",marginTop:8,fontWeight:600}}>⚠️ {errs.merkHP}</div>}
             </div>
-            <div style={{marginBottom:18}}>
-              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Tipe HP</label>
-              <input style={inp("")} placeholder="cth: Galaxy A54" value={fd.tipeHP} onChange={function(e){setFd(function(p){return Object.assign({},p,{tipeHP:e.target.value});});}}/>
+            <div style={{display:"flex",gap:12,marginBottom:18}}>
+              <div style={{flex:1}}>
+                <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Tipe HP</label>
+                <input style={inp("")} placeholder="cth: Galaxy A54" value={fd.tipeHP} onChange={function(e){setFd(function(p){return Object.assign({},p,{tipeHP:e.target.value});});}}/>
+              </div>
+              <div style={{flex:1}}>
+                <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Warna HP</label>
+                <select style={Object.assign({},inp(""),{appearance:"auto"})} value={fd.warnaHP} onChange={function(e){setFd(function(p){return Object.assign({},p,{warnaHP:e.target.value});});}}>
+                  <option value="">Pilih warna</option>
+                  {COLORS.map(function(c){return <option key={c} value={c}>{c}</option>;})}
+                </select>
+              </div>
             </div>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>IMEI / Serial Number</label>
+              <input style={inp("")} placeholder="cth: 354678091234567" value={fd.imei} onChange={function(e){setFd(function(p){return Object.assign({},p,{imei:e.target.value});});}}/>
+              <div style={{fontSize:11,color:T.tm,marginTop:4}}>Dial *#06# untuk cek IMEI</div>
+            </div>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Kondisi Fisik</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                {KONDISI.map(function(k){ return <div key={k} onClick={function(){setFd(function(p){return Object.assign({},p,{kondisi:k});});}} style={{padding:"10px 16px",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",background:fd.kondisi===k?"linear-gradient(135deg,#8B5CF6,#6366F1)":dark?"#1E293B":"#F5F3FF",color:fd.kondisi===k?"#fff":"#7C3AED",boxShadow:fd.kondisi===k?"0 4px 12px rgba(139,92,246,0.25)":"none"}}>{k}</div>; })}
+              </div>
+            </div>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Kelengkapan Diterima</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                {KELENGKAPAN.map(function(k){ var sel2 = (fd.kelengkapan||[]).indexOf(k) >= 0; return <div key={k} onClick={function(){setFd(function(p){var arr = p.kelengkapan||[]; var nxt = sel2 ? arr.filter(function(x){return x!==k;}) : arr.concat([k]); return Object.assign({},p,{kelengkapan:nxt});});}} style={{padding:"10px 16px",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",background:sel2?"linear-gradient(135deg,#10B981,#059669)":dark?"#1E293B":"#ECFDF5",color:sel2?"#fff":"#059669",boxShadow:sel2?"0 4px 12px rgba(16,185,129,0.25)":"none",display:"flex",alignItems:"center",gap:4}}>{sel2?"✓ ":""}{k}</div>; })}
+              </div>
+              <div style={{fontSize:11,color:T.tm,marginTop:6}}>Tap untuk centang/uncentang. Dipilih: {(fd.kelengkapan||[]).length} item</div>
+            </div>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Password / Pola Kunci</label>
+              <input style={inp("")} placeholder="Opsional, untuk keperluan testing" value={fd.passwordHP} onChange={function(e){setFd(function(p){return Object.assign({},p,{passwordHP:e.target.value});});}}/>
+              <div style={{fontSize:11,color:T.tm,marginTop:4}}>🔒 Info ini hanya untuk teknisi, tidak dibagikan</div>
+            </div>
+          </div>}
+
+          {step===2 && <div style={{animation:"scaleIn .25s ease"}}>
+            <div style={{fontSize:22,fontWeight:800,color:T.text,marginBottom:4}}>🔧 Kerusakan & Prioritas</div>
+            <div style={{fontSize:14,color:T.ts,marginBottom:24}}>Detail masalah perangkat</div>
             <div style={{marginBottom:18}}>
               <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Kerusakan <span style={{color:"#EF4444"}}>*</span></label>
               <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
@@ -414,28 +463,49 @@ export default function App() {
             </div>
             <div style={{marginBottom:18}}>
               <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Keluhan Detail</label>
-              <textarea style={Object.assign({},inp(""),{minHeight:90,resize:"vertical"})} placeholder="Deskripsikan keluhan..." value={fd.keluhan} onChange={function(e){setFd(function(p){return Object.assign({},p,{keluhan:e.target.value});});}}/>
+              <textarea style={Object.assign({},inp(""),{minHeight:90,resize:"vertical"})} placeholder="Deskripsikan keluhan customer secara detail..." value={fd.keluhan} onChange={function(e){setFd(function(p){return Object.assign({},p,{keluhan:e.target.value});});}}/>
+            </div>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Prioritas Service</label>
+              <div style={{display:"flex",gap:10}}>
+                {PRIORITAS.map(function(pr){ return <div key={pr.v} onClick={function(){setFd(function(p){return Object.assign({},p,{prioritas:pr.v});});}} style={{flex:1,padding:"14px 10px",borderRadius:14,textAlign:"center",cursor:"pointer",background:fd.prioritas===pr.v?"linear-gradient(135deg,"+pr.c+","+pr.c+"CC)":dark?"#1E293B":"#F1F5F9",color:fd.prioritas===pr.v?"#fff":pr.c,fontWeight:800,fontSize:14,boxShadow:fd.prioritas===pr.v?"0 4px 12px "+pr.c+"40":"none",border:fd.prioritas===pr.v?"none":"2px solid "+pr.c+"20"}}><div style={{fontSize:20,marginBottom:4}}>{pr.e}</div>{pr.v}</div>; })}
+              </div>
+            </div>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Masih Garansi?</label>
+              <div style={{display:"flex",gap:10}}>
+                {["Ya","Tidak"].map(function(g){ return <div key={g} onClick={function(){setFd(function(p){return Object.assign({},p,{garansi:g});});}} style={{flex:1,padding:"12px",borderRadius:12,textAlign:"center",cursor:"pointer",background:fd.garansi===g?(g==="Ya"?"linear-gradient(135deg,#10B981,#059669)":"linear-gradient(135deg,#EF4444,#DC2626)"):dark?"#1E293B":"#F1F5F9",color:fd.garansi===g?"#fff":T.ts,fontWeight:700,fontSize:14}}>{g==="Ya"?"✅ Ya, Masih":"❌ Tidak"}</div>; })}
+              </div>
             </div>
           </div>}
 
-          {step===2 && <div style={{animation:"scaleIn .25s ease"}}>
-            <div style={{fontSize:22,fontWeight:800,color:T.text,marginBottom:4}}>💰 Biaya & Info</div>
-            <div style={{fontSize:14,color:T.ts,marginBottom:24}}>Estimasi biaya dan teknisi</div>
+          {step===3 && <div style={{animation:"scaleIn .25s ease"}}>
+            <div style={{fontSize:22,fontWeight:800,color:T.text,marginBottom:4}}>💰 Biaya & Penugasan</div>
+            <div style={{fontSize:14,color:T.ts,marginBottom:24}}>Estimasi biaya, teknisi, dan jadwal</div>
             <div style={{display:"flex",gap:12,marginBottom:18}}>
               <div style={{flex:1}}><label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Estimasi Biaya</label><input style={inp("")} placeholder="0" type="number" value={fd.biayaEstimasi} onChange={function(e){setFd(function(p){return Object.assign({},p,{biayaEstimasi:e.target.value});});}}/></div>
-              <div style={{flex:1}}><label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Uang Muka</label><input style={inp("")} placeholder="0" type="number" value={fd.uangMuka} onChange={function(e){setFd(function(p){return Object.assign({},p,{uangMuka:e.target.value});});}}/></div>
+              <div style={{flex:1}}><label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Uang Muka (DP)</label><input style={inp("")} placeholder="0" type="number" value={fd.uangMuka} onChange={function(e){setFd(function(p){return Object.assign({},p,{uangMuka:e.target.value});});}}/></div>
             </div>
-            <div style={{marginBottom:18}}><label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Teknisi</label><input style={inp("")} placeholder="Nama teknisi" value={fd.teknisi} onChange={function(e){setFd(function(p){return Object.assign({},p,{teknisi:e.target.value});});}}/></div>
-            <div style={{marginBottom:18}}><label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Catatan</label><textarea style={Object.assign({},inp(""),{minHeight:80,resize:"vertical"})} placeholder="Catatan internal..." value={fd.catatan} onChange={function(e){setFd(function(p){return Object.assign({},p,{catatan:e.target.value});});}}/></div>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Teknisi</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                {TEKNISI_LIST.map(function(t){ return <div key={t} onClick={function(){setFd(function(p){return Object.assign({},p,{teknisi:t});});}} style={{padding:"10px 16px",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",background:fd.teknisi===t?"linear-gradient(135deg,#3B82F6,#6366F1)":dark?"#1E293B":"#EFF6FF",color:fd.teknisi===t?"#fff":"#3B82F6",boxShadow:fd.teknisi===t?"0 4px 12px rgba(59,130,246,0.25)":"none",display:"flex",alignItems:"center",gap:4}}>{fd.teknisi===t?"✓ ":""}🧑‍🔧 {t}</div>; })}
+              </div>
+            </div>
+            <div style={{marginBottom:18}}>
+              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Estimasi Tanggal Selesai</label>
+              <input style={inp("")} type="date" value={fd.tglEstSelesai} onChange={function(e){setFd(function(p){return Object.assign({},p,{tglEstSelesai:e.target.value});});}}/>
+            </div>
+            <div style={{marginBottom:18}}><label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Catatan Internal</label><textarea style={Object.assign({},inp(""),{minHeight:80,resize:"vertical"})} placeholder="Catatan untuk teknisi..." value={fd.catatan} onChange={function(e){setFd(function(p){return Object.assign({},p,{catatan:e.target.value});});}}/></div>
             <div style={{background:dark?"#0F172A":"#F8FAFC",borderRadius:16,padding:18,marginBottom:20,border:"1.5px dashed "+T.cb}}>
-              <div style={{fontSize:12,fontWeight:800,color:T.tm,textTransform:"uppercase",letterSpacing:"1px",marginBottom:12}}>📋 Ringkasan</div>
-              {[["Customer",fd.namaCustomer],["HP",fd.merkHP+" "+fd.tipeHP],["Kerusakan",fd.kerusakan],["Estimasi",rp(fd.biayaEstimasi||0)]].map(function(r,i){ return <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:13}}><span style={{color:T.tm}}>{r[0]}</span><span style={{fontWeight:700,color:T.text}}>{r[1]||"-"}</span></div>; })}
+              <div style={{fontSize:12,fontWeight:800,color:T.tm,textTransform:"uppercase",letterSpacing:"1px",marginBottom:12}}>📋 Ringkasan Order</div>
+              {[["Customer",fd.namaCustomer],["No. HP",fd.noHP],["Alamat",fd.alamat],["HP",fd.merkHP+" "+(fd.tipeHP||"")+" "+(fd.warnaHP||"")],["IMEI",fd.imei],["Kondisi",fd.kondisi],["Kelengkapan",(fd.kelengkapan||[]).join(", ")],["Kerusakan",fd.kerusakan],["Prioritas",fd.prioritas],["Garansi",fd.garansi],["Teknisi",fd.teknisi],["Est. Selesai",fd.tglEstSelesai?fmt(fd.tglEstSelesai):"-"],["Estimasi",rp(fd.biayaEstimasi||0)],["DP",rp(fd.uangMuka||0)]].map(function(r,i){ return <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",fontSize:13}}><span style={{color:T.tm}}>{r[0]}</span><span style={{fontWeight:700,color:T.text,textAlign:"right",maxWidth:"60%",overflow:"hidden",textOverflow:"ellipsis"}}>{r[1]||"-"}</span></div>; })}
             </div>
           </div>}
 
           <div style={{display:"flex",gap:12,marginTop:8}}>
             {step>0 && <button onClick={function(){setStep(function(s){return Math.max(0,s-1);});}} style={{flex:1,padding:16,borderRadius:16,border:"1.5px solid "+T.cb,background:"transparent",color:T.ts,fontSize:15,fontWeight:700,cursor:"pointer"}}>← Kembali</button>}
-            {step<2
+            {step<3
               ? <button onClick={function(){if(validate(step))setStep(function(s){return s+1;});}} style={{flex:2,padding:16,borderRadius:16,border:"none",background:"linear-gradient(135deg,#3B82F6,#6366F1)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 20px rgba(59,130,246,0.3)"}}>Lanjut →</button>
               : <button onClick={submitForm} disabled={loading} style={{flex:2,padding:16,borderRadius:16,border:"none",background:"linear-gradient(135deg,#10B981,#059669)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 20px rgba(16,185,129,0.3)",opacity:loading?0.7:1}}>{loading?"⏳ Menyimpan...":"✅ Simpan"}</button>
             }
@@ -470,7 +540,6 @@ export default function App() {
         {stats.rev > 0 && <div style={{marginTop:10,padding:"10px 14px",background:"rgba(16,185,129,0.1)",borderRadius:12,display:"flex",alignItems:"center",gap:8,position:"relative",zIndex:1}}><span style={{fontSize:14}}>💰</span><span style={{fontSize:12,color:"#34D399",fontWeight:700}}>Pendapatan: {rp(stats.rev)}</span></div>}
       </div>
 
-      {(tab === "home" || tab === "list" || tab === "add") && (
       <div style={{padding:"14px 16px 110px"}}>
         {/* Search */}
         <div style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:16,padding:"12px 16px",marginBottom:12,boxShadow:"0 1px 3px rgba(0,0,0,0.04)",border:"1px solid "+T.cb}}>
@@ -512,155 +581,17 @@ export default function App() {
                     <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:8,fontSize:12,fontWeight:700,background:dark?"#1E293B":"#FEF2F2",color:"#EF4444"}}>🔧 {item.kerusakan}</span>
                     <span style={{fontSize:12,color:T.tm,display:"flex",alignItems:"center",gap:4,fontWeight:600}}><Ico name="clock" size={13}/> {fmt(item.tanggalMasuk)}</span>
                   </div>
-                  {Number(item.biayaEstimasi) > 0 && <div style={{marginTop:8,fontSize:13,fontWeight:800,color:"#3B82F6"}}>{rp(item.biayaEstimasi)}</div>}
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginTop:8,flexWrap:"wrap"}}>
+                    {Number(item.biayaEstimasi) > 0 && <span style={{fontSize:12,fontWeight:800,color:"#3B82F6"}}>{rp(item.biayaEstimasi)}</span>}
+                    {item.prioritas && item.prioritas !== "Normal" && <span style={{fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:6,background:item.prioritas==="Express"?"#FEF2F2":"#FFFBEB",color:item.prioritas==="Express"?"#EF4444":"#F59E0B"}}>{item.prioritas==="Express"?"🔴":"🟡"} {item.prioritas}</span>}
+                    {item.garansi === "Ya" && <span style={{fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:6,background:"#ECFDF5",color:"#10B981"}}>✅ Garansi</span>}
+                  </div>
                 </div>
               </div>
             </div>
           );
         })}
       </div>
-      )}
-
-      {tab === "stats" && (function(){
-        var statBreak = ["Diterima","Diagnosa","Proses","Selesai","Diambil","Batal"].map(function(s){
-          return {name:s, count:data.filter(function(d){return d.status===s;}).length};
-        });
-        var brandAgg = {};
-        data.forEach(function(d){ if(d.merkHP) brandAgg[d.merkHP]=(brandAgg[d.merkHP]||0)+1; });
-        var brandList = Object.keys(brandAgg).map(function(k){return {name:k,count:brandAgg[k]};}).sort(function(a,b){return b.count-a.count;}).slice(0,5);
-        var damAgg = {};
-        data.forEach(function(d){ if(d.kerusakan) damAgg[d.kerusakan]=(damAgg[d.kerusakan]||0)+1; });
-        var damList = Object.keys(damAgg).map(function(k){return {name:k,count:damAgg[k]};}).sort(function(a,b){return b.count-a.count;}).slice(0,5);
-        var paidTotal = data.reduce(function(a,b){return a+(Number(b.uangMuka)||0);},0);
-        var avgTicket = stats.selesai > 0 ? Math.round(stats.rev/stats.selesai) : 0;
-        var maxStat = Math.max.apply(null, statBreak.map(function(s){return s.count;})) || 1;
-        var maxBrand = brandList.length ? brandList[0].count : 1;
-        var maxDam = damList.length ? damList[0].count : 1;
-        return (
-        <div style={{padding:"14px 16px 110px",animation:"fadeSlide .3s ease"}}>
-          <div style={{fontSize:22,fontWeight:800,color:T.text,marginBottom:4}}>📊 Laporan</div>
-          <div style={{fontSize:13,color:T.ts,marginBottom:18}}>Ringkasan performa service</div>
-
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-            {[["💰 Pendapatan",rp(stats.rev),"#10B981"],["💵 Total DP",rp(paidTotal),"#3B82F6"],["🎯 Avg Ticket",rp(avgTicket),"#8B5CF6"],["📦 Total Order",String(stats.total),T.text]].map(function(r,i){
-              return <div key={i} style={{background:T.card,borderRadius:16,padding:16,border:"1px solid "+T.cb}}>
-                <div style={{fontSize:11,color:T.tm,fontWeight:700,textTransform:"uppercase",letterSpacing:"1px",marginBottom:6}}>{r[0]}</div>
-                <div style={{fontSize:17,fontWeight:900,color:r[2]}}>{r[1]}</div>
-              </div>;
-            })}
-          </div>
-
-          <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:12,border:"1px solid "+T.cb}}>
-            <div style={{fontSize:13,fontWeight:800,color:T.text,marginBottom:14}}>Status Service</div>
-            {statBreak.map(function(s){
-              var sm = SMAP[s.name]||{};
-              var pct = (s.count/maxStat)*100;
-              return (
-                <div key={s.name} style={{marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,marginBottom:5,color:T.ts}}>
-                    <span>{sm.e} {s.name}</span><span style={{color:sm.c}}>{s.count}</span>
-                  </div>
-                  <div style={{height:8,borderRadius:8,background:dark?"#0F172A":"#F1F5F9",overflow:"hidden"}}>
-                    <div style={{width:pct+"%",height:"100%",borderRadius:8,background:sm.c||"#3B82F6",transition:"width .4s"}}/>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {brandList.length > 0 && (
-            <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:12,border:"1px solid "+T.cb}}>
-              <div style={{fontSize:13,fontWeight:800,color:T.text,marginBottom:14}}>📱 Top Merk HP</div>
-              {brandList.map(function(b,i){
-                var pct = (b.count/maxBrand)*100;
-                return (
-                  <div key={b.name} style={{marginBottom:10}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,marginBottom:5,color:T.ts}}>
-                      <span>{i+1}. {b.name}</span><span>{b.count}</span>
-                    </div>
-                    <div style={{height:8,borderRadius:8,background:dark?"#0F172A":"#F1F5F9",overflow:"hidden"}}>
-                      <div style={{width:pct+"%",height:"100%",borderRadius:8,background:"linear-gradient(90deg,#3B82F6,#8B5CF6)"}}/>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {damList.length > 0 && (
-            <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:12,border:"1px solid "+T.cb}}>
-              <div style={{fontSize:13,fontWeight:800,color:T.text,marginBottom:14}}>🔧 Kerusakan Terbanyak</div>
-              {damList.map(function(d,i){
-                var pct = (d.count/maxDam)*100;
-                return (
-                  <div key={d.name} style={{marginBottom:10}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,marginBottom:5,color:T.ts}}>
-                      <span>{i+1}. {d.name}</span><span>{d.count}</span>
-                    </div>
-                    <div style={{height:8,borderRadius:8,background:dark?"#0F172A":"#F1F5F9",overflow:"hidden"}}>
-                      <div style={{width:pct+"%",height:"100%",borderRadius:8,background:"linear-gradient(90deg,#EF4444,#F97316)"}}/>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        );
-      })()}
-
-      {tab === "more" && (
-        <div style={{padding:"14px 16px 110px",animation:"fadeSlide .3s ease"}}>
-          <div style={{fontSize:22,fontWeight:800,color:T.text,marginBottom:4}}>⚙️ Lainnya</div>
-          <div style={{fontSize:13,color:T.ts,marginBottom:18}}>Pengaturan & informasi aplikasi</div>
-
-          <div style={{background:T.card,borderRadius:18,marginBottom:14,border:"1px solid "+T.cb,overflow:"hidden"}}>
-            <div onClick={function(){setDark(!dark);}} style={{display:"flex",alignItems:"center",gap:14,padding:16,cursor:"pointer"}}>
-              <div style={{width:40,height:40,borderRadius:12,background:dark?"#1E293B":"#FEF3C7",display:"flex",alignItems:"center",justifyContent:"center",color:dark?"#FCD34D":"#F59E0B"}}><Ico name={dark?"sun":"moon"} size={20}/></div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:15,fontWeight:700,color:T.text}}>Mode {dark?"Terang":"Gelap"}</div>
-                <div style={{fontSize:12,color:T.ts}}>{dark?"Beralih ke tampilan terang":"Beralih ke tampilan gelap"}</div>
-              </div>
-              <div style={{width:42,height:24,borderRadius:12,background:dark?"#3B82F6":"#CBD5E1",position:"relative",transition:"all .2s"}}>
-                <div style={{position:"absolute",top:2,left:dark?20:2,width:20,height:20,borderRadius:"50%",background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.2)",transition:"all .2s"}}/>
-              </div>
-            </div>
-            <div onClick={function(){fetchData(true);flash("Data disegarkan 🔄");}} style={{display:"flex",alignItems:"center",gap:14,padding:16,cursor:"pointer",borderTop:"1px solid "+T.dv}}>
-              <div style={{width:40,height:40,borderRadius:12,background:dark?"#1E293B":"#DBEAFE",display:"flex",alignItems:"center",justifyContent:"center",color:"#3B82F6"}}><Ico name="refresh" size={20}/></div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:15,fontWeight:700,color:T.text}}>Segarkan Data</div>
-                <div style={{fontSize:12,color:T.ts}}>Ambil data terbaru dari server</div>
-              </div>
-              <div style={{color:T.tm}}><Ico name="chev" size={18}/></div>
-            </div>
-            <div onClick={function(){setPage("form");setTab("add");setStep(0);setErrs({});}} style={{display:"flex",alignItems:"center",gap:14,padding:16,cursor:"pointer",borderTop:"1px solid "+T.dv}}>
-              <div style={{width:40,height:40,borderRadius:12,background:dark?"#1E293B":"#ECFDF5",display:"flex",alignItems:"center",justifyContent:"center",color:"#10B981"}}><Ico name="plus" size={20}/></div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:15,fontWeight:700,color:T.text}}>Tambah Service Baru</div>
-                <div style={{fontSize:12,color:T.ts}}>Buat service order</div>
-              </div>
-              <div style={{color:T.tm}}><Ico name="chev" size={18}/></div>
-            </div>
-          </div>
-
-          <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:14,border:"1px solid "+T.cb}}>
-            <div style={{fontSize:11,color:T.tm,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:12}}>ℹ️ Info Aplikasi</div>
-            {[["Nama","ServiceKu"],["Versi","1.0.0"],["Total Data",String(data.length)+" order"],["Mode","Phone Service Center"]].map(function(r,i){
-              return <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:i<3?"1px solid "+T.dv:"none"}}>
-                <span style={{fontSize:13,color:T.ts}}>{r[0]}</span>
-                <span style={{fontSize:13,fontWeight:700,color:T.text}}>{r[1]}</span>
-              </div>;
-            })}
-          </div>
-
-          <div style={{background:"linear-gradient(135deg,#3B82F6,#6366F1)",borderRadius:18,padding:24,color:"#fff",textAlign:"center"}}>
-            <div style={{fontSize:36,marginBottom:8}}>🔧</div>
-            <div style={{fontSize:17,fontWeight:800,marginBottom:4}}>ServiceKu</div>
-            <div style={{fontSize:12,opacity:0.9,marginBottom:14}}>Dibuat dengan ❤️ untuk Reza</div>
-            <div style={{fontSize:11,opacity:0.7}}>© 2026 Phone Service Center</div>
-          </div>
-        </div>
-      )}
 
       {/* FAB */}
       <button onClick={function(){setPage("form");setTab("add");setStep(0);setErrs({});}} style={{position:"fixed",bottom:88,right:"calc(50% - 210px)",width:60,height:60,borderRadius:20,background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 6px 24px rgba(59,130,246,0.4)",cursor:"pointer",zIndex:99,border:"none"}}><Ico name="plus" size={26}/></button>
