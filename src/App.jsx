@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { supabase, hasSupabase } from "./lib/supabase";
 import logo from "./assets/logo.jpeg";
 
-const API = "https://script.google.com/macros/s/AKfycbzuYe0l0W53_eq0G03MtX1nUq37imRAI17G44PgTCkAywfw1uhssTHF4CsZHQSGvF_D0g/exec";
 const STORAGE_KEY = "serviceku_v3_data";
 const SETTINGS_KEY = "serviceku_v3_settings";
 
@@ -378,10 +378,19 @@ export default function App() {
 
   const fetchData = useCallback((silent) => {
     if (!silent) setLoading(true); else setSpinning(true);
-    fetch(API + "?action=getAll").then(r => r.json()).then(j => {
-      const arr = j.status === "success" ? (j.data || []) : [];
-      if (arr.length) { setData(arr); try { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); } catch {} }
-      else throw new Error("empty");
+    if (!hasSupabase) {
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY);
+        if (cached) setData(JSON.parse(cached));
+        else setData(DEMO);
+      } catch { setData(DEMO); }
+      setLoading(false); setSpinning(false);
+      return;
+    }
+    supabase.from("services").select("*").order("created_at", {ascending:false}).then(res => {
+      if (res.error || !res.data || !res.data.length) throw new Error("empty");
+      setData(res.data);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data)); } catch {}
     }).catch(() => {
       try {
         const cached = localStorage.getItem(STORAGE_KEY);
@@ -490,30 +499,48 @@ export default function App() {
     if (!validate(3)) return;
     setLoading(true);
     const send = Object.assign({}, fd, {kelengkapan:(fd.kelengkapan||[]).join(",")});
-    const payload = Object.assign({}, send, {action:"tambah",status:"Diterima",tanggalMasuk:today()});
-    const body = Object.keys(payload).map(k => k + "=" + encodeURIComponent(payload[k])).join("&");
-    fetch(API, {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body}).then(() => {
-      flash("Service order berhasil ditambahkan! 🎉");
-    }).catch(() => {
-      const ni = Object.assign({}, send, {id:"SRV" + String(data.length + 1).padStart(3,"0"),status:"Diterima",tanggalMasuk:today(),rating:0});
+    const payload = {
+      namaCustomer: send.namaCustomer, noHP: send.noHP, alamat: send.alamat || null,
+      merkHP: send.merkHP || null, tipeHP: send.tipeHP || null, warnaHP: send.warnaHP || null,
+      imei: send.imei || null, kondisi: send.kondisi || null, kelengkapan: send.kelengkapan || null,
+      kerusakan: send.kerusakan || null, keluhan: send.keluhan || null,
+      prioritas: send.prioritas || "Normal", status: "Diterima",
+      biayaEstimasi: Number(send.biayaEstimasi) || 0, uangMuka: Number(send.uangMuka) || 0,
+      teknisi: send.teknisi || null, passwordHP: send.passwordHP || null,
+      garansi: send.garansi || "Tidak", tglEstSelesai: send.tglEstSelesai || null,
+      tanggalMasuk: today(), catatan: send.catatan || null,
+    };
+    const done = () => {
+      setFd(initFd); setStep(0); setPage("main"); setTab("home"); setLoading(false);
+      fetchData(true);
+    };
+    if (!hasSupabase) {
+      const ni = Object.assign({}, payload, {id:"SRV" + String(data.length + 1).padStart(3,"0"), rating:0});
       const newData = [ni].concat(data);
       setData(newData);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(newData)); } catch {}
       flash("Tersimpan (offline mode) 📱");
-    }).finally(() => {
-      setFd(initFd); setStep(0); setPage("main"); setTab("home"); setLoading(false);
-      fetchData(true);
-    });
+      done();
+      return;
+    }
+    supabase.from("services").insert([payload]).select().then(res => {
+      if (res.error) flash("Gagal menyimpan: " + res.error.message, "error");
+      else flash("Service order berhasil ditambahkan! 🎉");
+    }).catch(() => {
+      flash("Gagal menyimpan ke server", "error");
+    }).finally(done);
   }
 
   function updStatus(item, ns) {
     setModal(null);
-    fetch(API, {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:`action=updateStatus&id=${item.id}&status=${ns}`}).catch(() => {});
     const newData = data.map(d => d.id === item.id ? Object.assign({}, d, {status:ns}) : d);
     setData(newData);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(newData)); } catch {}
     setSel(Object.assign({}, item, {status:ns}));
     flash(`Status diubah → ${(SMAP[ns]||{}).e} ${ns}`);
+    if (hasSupabase) {
+      supabase.from("services").update({status: ns}).eq("id", item.id).then(() => {});
+    }
   }
 
   function rateItem(item, r) {
