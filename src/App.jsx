@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-
-const API = "https://script.google.com/macros/s/AKfycbxj4DcCwRS0sIikyNh4qmbz5kNdG6ZFGF1MeDxNzB4-uBor924tApvlLfg3-SoFH3GimQ/exec";
+import { supabase, hasSupabase } from "./lib/supabase";
+import logo from "./assets/logo.jpeg";
 
 const SFLOW = ["Diterima","Diagnosa","Proses","Selesai","Diambil"];
 const SMAP = {
@@ -129,7 +129,7 @@ function Modal({title, msg, onOk, onNo, okText, danger}) {
 function Nota({item, onClose}) {
   var sisa = (Number(item.biayaEstimasi) || 0) - (Number(item.uangMuka) || 0);
   function sendWA() {
-    var t = "📋 *NOTA SERVICE*\n━━━━━━━━━━━━\nID: " + item.id + "\nCustomer: " + item.namaCustomer + "\nHP: " + item.merkHP + " " + (item.tipeHP||"") + "\nWarna: " + (item.warnaHP||"-") + "\nIMEI: " + (item.imei||"-") + "\nKondisi: " + (item.kondisi||"-") + "\nKelengkapan: " + (item.kelengkapan||"-") + "\nKerusakan: " + item.kerusakan + "\nPrioritas: " + (item.prioritas||"Normal") + "\nStatus: " + item.status + "\nTeknisi: " + (item.teknisi||"-") + "\nEstimasi: " + rp(item.biayaEstimasi) + "\nDP: " + rp(item.uangMuka) + "\nSisa: " + rp(sisa) + "\n━━━━━━━━━━━━\n_ServiceKu Phone Center_";
+    var t = "📋 *NOTA SERVICE*\n━━━━━━━━━━━━\nID: " + item.id + "\nCustomer: " + item.namaCustomer + "\nHP: " + item.merkHP + " " + (item.tipeHP||"") + "\nWarna: " + (item.warnaHP||"-") + "\nIMEI: " + (item.imei||"-") + "\nKondisi: " + (item.kondisi||"-") + "\nKelengkapan: " + (item.kelengkapan||"-") + "\nKerusakan: " + item.kerusakan + "\nPrioritas: " + (item.prioritas||"Normal") + "\nStatus: " + item.status + "\nTeknisi: " + (item.teknisi||"-") + "\nEstimasi: " + rp(item.biayaEstimasi) + "\nDP: " + rp(item.uangMuka) + "\nSisa: " + rp(sisa) + "\n━━━━━━━━━━━━\n_MAX Mobile Service_";
     window.open("https://wa.me/" + (item.noHP || "").replace(/^0/,"62") + "?text=" + encodeURIComponent(t), "_blank");
   }
   var rows = [["Customer",item.namaCustomer],["No. HP",item.noHP],["Alamat",item.alamat],["Perangkat",item.merkHP + " " + (item.tipeHP||"")],["Warna",item.warnaHP],["IMEI/SN",item.imei],["Kondisi",item.kondisi],["Kelengkapan",item.kelengkapan],["Kerusakan",item.kerusakan],["Prioritas",item.prioritas],["Teknisi",item.teknisi||"-"],["Status",item.status]];
@@ -138,7 +138,7 @@ function Nota({item, onClose}) {
       <div style={{background:"#fff",borderRadius:20,width:"100%",maxWidth:380,maxHeight:"85vh",overflow:"auto",animation:"scaleIn .25s ease"}}>
         <div style={{background:"linear-gradient(135deg,#0F172A,#1E293B)",color:"#fff",padding:"20px 24px",borderRadius:"20px 20px 0 0",textAlign:"center"}}>
           <div style={{fontSize:20,fontWeight:800}}>📋 Nota Service</div>
-          <div style={{fontSize:12,color:"#94A3B8",marginTop:4}}>ServiceKu Phone Center</div>
+          <div style={{fontSize:12,color:"#94A3B8",marginTop:4}}>MAX Mobile Service</div>
         </div>
         <div style={{padding:24}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:16,paddingBottom:12,borderBottom:"2px dashed #E2E8F0"}}>
@@ -212,8 +212,14 @@ export default function App() {
 
   var fetchData = useCallback(function(silent) {
     if (!silent) setLoading(true); else setSpinning(true);
-    fetch(API + "?action=getAll").then(function(r){return r.json();}).then(function(j) {
-      setData(j.status === "success" ? (j.data || []) : []);
+    if (!hasSupabase) {
+      setData(DEMO);
+      setLoading(false); setSpinning(false);
+      return;
+    }
+    supabase.from("services").select("*").order("created_at", {ascending:false}).then(function(res) {
+      if (res.error || !res.data) { setData(DEMO); }
+      else { setData(res.data); }
     }).catch(function() {
       setData(DEMO);
     }).finally(function() {
@@ -250,27 +256,48 @@ export default function App() {
     if (!validate(3)) return;
     setLoading(true);
     var sendFd = Object.assign({}, fd, {kelengkapan: (fd.kelengkapan||[]).join(",")});
-    var payload = Object.assign({}, sendFd, {action:"tambah",status:"Diterima",tanggalMasuk:today()});
-    var body = Object.keys(payload).map(function(k){return k+"="+encodeURIComponent(payload[k]);}).join("&");
-    fetch(API, {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:body}).then(function() {
-      flash("Service order berhasil! 🎉");
-    }).catch(function() {
-      var ni = Object.assign({}, fd, {id:"SRV"+String(data.length+1).padStart(3,"0"),status:"Diterima",tanggalMasuk:today()});
-      setData(function(p){return [ni].concat(p);});
-      flash("Tersimpan (offline) 📱");
-    }).finally(function() {
+    var payload = {
+      namaCustomer: sendFd.namaCustomer, noHP: sendFd.noHP, alamat: sendFd.alamat || null,
+      merkHP: sendFd.merkHP || null, tipeHP: sendFd.tipeHP || null, warnaHP: sendFd.warnaHP || null,
+      imei: sendFd.imei || null, kondisi: sendFd.kondisi || null, kelengkapan: sendFd.kelengkapan || null,
+      kerusakan: sendFd.kerusakan || null, keluhan: sendFd.keluhan || null,
+      prioritas: sendFd.prioritas || "Normal", status: "Diterima",
+      biayaEstimasi: Number(sendFd.biayaEstimasi) || 0, uangMuka: Number(sendFd.uangMuka) || 0,
+      teknisi: sendFd.teknisi || null, passwordHP: sendFd.passwordHP || null,
+      garansi: sendFd.garansi || "Tidak", tglEstSelesai: sendFd.tglEstSelesai || null,
+      tanggalMasuk: today(), catatan: sendFd.catatan || null,
+    };
+    var done = function() {
       setFd({namaCustomer:"",noHP:"",alamat:"",merkHP:"",tipeHP:"",warnaHP:"",imei:"",kondisi:"",kelengkapan:[],kerusakan:"",keluhan:"",prioritas:"Normal",biayaEstimasi:"",uangMuka:"",teknisi:"",passwordHP:"",garansi:"",tglEstSelesai:"",catatan:""});
       setStep(0); setPage("home"); setTab("home"); setLoading(false); fetchData(true);
-    });
+    };
+    if (!hasSupabase) {
+      var ni = Object.assign({}, payload, {id:"SRV"+String(data.length+1).padStart(3,"0")});
+      setData(function(p){return [ni].concat(p);});
+      flash("Tersimpan (offline) 📱");
+      done();
+      return;
+    }
+    supabase.from("services").insert([payload]).select().then(function(res) {
+      if (res.error) {
+        flash("Gagal menyimpan: " + res.error.message, "error");
+      } else {
+        flash("Service order berhasil! 🎉");
+      }
+    }).catch(function() {
+      flash("Gagal menyimpan ke server", "error");
+    }).finally(done);
   }
 
   function updStatus(item, ns) {
     setModal(null);
-    fetch(API, {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"action=updateStatus&id="+item.id+"&status="+ns}).catch(function(){});
     setData(function(p){return p.map(function(d){return d.id===item.id?Object.assign({},d,{status:ns}):d;});});
     var upd = Object.assign({}, item, {status:ns});
     setSel(upd);
     flash("Status → " + (SMAP[ns]||{}).e + " " + ns);
+    if (hasSupabase) {
+      supabase.from("services").update({status: ns}).eq("id", item.id).then(function(){});
+    }
   }
 
   var T = dark
@@ -285,11 +312,11 @@ export default function App() {
     return (
       <div style={Object.assign({},base,{background:"linear-gradient(145deg,#0F172A,#1E293B,#334155)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#fff"})}>
         <style>{CSS_TEXT}</style>
-        <div style={{width:90,height:90,borderRadius:24,background:"linear-gradient(135deg,#38BDF8,#818CF8,#A78BFA)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 20px 60px rgba(56,189,248,0.3)",animation:"pulse 2s ease infinite",marginBottom:28}}>
-          <span style={{fontSize:42}}>🔧</span>
+        <div style={{width:200,height:110,borderRadius:20,overflow:"hidden",boxShadow:"0 20px 60px rgba(56,189,248,0.4)",animation:"pulse 2.4s ease infinite",marginBottom:24,border:"1.5px solid rgba(56,189,248,0.25)"}}>
+          <img src={logo} alt="MAX Mobile Service" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
         </div>
-        <div style={{fontSize:32,fontWeight:800,letterSpacing:"-1px",animation:"slideUp .6s ease .3s both"}}>ServiceKu</div>
-        <div style={{fontSize:13,color:"#94A3B8",fontWeight:600,letterSpacing:"3px",textTransform:"uppercase",marginTop:6,animation:"slideUp .6s ease .5s both"}}>Phone Service Center</div>
+        <div style={{fontSize:28,fontWeight:900,letterSpacing:"2px",animation:"slideUp .6s ease .3s both"}}>MAX MOBILE</div>
+        <div style={{fontSize:12,color:"#94A3B8",fontWeight:700,letterSpacing:"4px",textTransform:"uppercase",marginTop:6,animation:"slideUp .6s ease .5s both"}}>Apple & Android Service</div>
         <div style={{marginTop:40,width:200,height:3,borderRadius:4,background:"rgba(255,255,255,0.1)",overflow:"hidden",animation:"slideUp .6s ease .7s both"}}>
           <div style={{width:"60%",height:"100%",borderRadius:4,background:"linear-gradient(90deg,#38BDF8,#818CF8)",animation:"barLoad 2s ease infinite"}} />
         </div>
@@ -524,10 +551,12 @@ export default function App() {
       <div style={{background:T.hbg,color:"#fff",padding:"16px 20px 20px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:-80,right:-80,width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(56,189,248,0.12),transparent 70%)"}} />
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,position:"relative",zIndex:1}}>
-          <div style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,#38BDF8,#818CF8)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 15px rgba(56,189,248,0.3)",fontSize:20}}>🔧</div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:22,fontWeight:800,letterSpacing:"-0.5px"}}>ServiceKu</div>
-            <div style={{fontSize:11,color:"#94A3B8",fontWeight:600,letterSpacing:"1.5px",textTransform:"uppercase"}}>Phone Service Center</div>
+          <div style={{width:52,height:44,borderRadius:12,overflow:"hidden",boxShadow:"0 4px 15px rgba(56,189,248,0.35)",flexShrink:0,border:"1px solid rgba(56,189,248,0.3)"}}>
+            <img src={logo} alt="MAX" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:19,fontWeight:900,letterSpacing:"0.5px"}}>MAX MOBILE</div>
+            <div style={{fontSize:10,color:"#94A3B8",fontWeight:700,letterSpacing:"1.3px",textTransform:"uppercase"}}>Apple &amp; Android Service</div>
           </div>
           <div onClick={function(){setDark(!dark);}} style={{cursor:"pointer",padding:8,borderRadius:10,background:"rgba(255,255,255,0.08)"}}><Ico name={dark?"sun":"moon"}/></div>
           <div onClick={function(){fetchData(true);}} style={{cursor:"pointer",padding:8,borderRadius:10,background:"rgba(255,255,255,0.08)",animation:spinning?"spin 1s linear infinite":"none"}}><Ico name="refresh"/></div>
