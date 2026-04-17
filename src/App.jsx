@@ -1,1330 +1,2127 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { supabase, hasSupabase } from "./lib/supabase";
-import logo from "./assets/logo.jpeg";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 
-const STORAGE_KEY = "serviceku_v3_data";
-const SETTINGS_KEY = "serviceku_v3_settings";
+// ==========================================================================
+// SERVISKITA PRO v2.0 — Service Management + POS Multi-Cabang Enterprise
+// Upgrade: Login multi-role, POS Kasir, Servis Kilat, Inventaris+Foto,
+//          Supplier, Riwayat Kulakan, Print Struk, Export CSV, Theme Toggle
+// Single-file JSX • localStorage • Bahasa Indonesia
+// ==========================================================================
 
-/* ═══════════════════════════════════════════════════════
-   CONSTANTS & DATA
-   ═══════════════════════════════════════════════════════ */
-const SFLOW = ["Diterima","Diagnosa","Proses","Selesai","Diambil"];
-const SMAP = {
-  Diterima:{c:"#3B82F6",bg:"#EFF6FF",e:"📥",txt:"Baru masuk"},
-  Diagnosa:{c:"#F59E0B",bg:"#FFFBEB",e:"🔍",txt:"Sedang diperiksa"},
-  Proses:{c:"#8B5CF6",bg:"#F5F3FF",e:"🔧",txt:"Sedang diperbaiki"},
-  Selesai:{c:"#10B981",bg:"#ECFDF5",e:"✅",txt:"Siap diambil"},
-  Diambil:{c:"#6B7280",bg:"#F3F4F6",e:"🤝",txt:"Sudah diambil"},
-  Batal:{c:"#EF4444",bg:"#FEF2F2",e:"❌",txt:"Dibatalkan"},
+// ---------- DATA ----------
+const BRANCHES = [
+  { id: "b1", name: "MAX Mobile Pusat",    addr: "Jl. Margonda Raya No. 12, Depok",    phone: "021-7788-1234", owner: "Pusat" },
+  { id: "b2", name: "MAX Mobile Pamulang", addr: "Jl. Siliwangi No. 45, Pamulang",     phone: "021-7788-2345", owner: "Cabang" },
+  { id: "b3", name: "MAX Mobile Tangsel",  addr: "Jl. BSD Boulevard No. 8, Tangsel",   phone: "021-7788-3456", owner: "Cabang" },
+];
+
+const DEVICE_TYPES = [
+  { id: "hp-android", name: "HP Android",  icon: "📱" },
+  { id: "hp-ios",     name: "iPhone",      icon: "📱" },
+  { id: "tab-android",name: "Tablet",      icon: "📲" },
+  { id: "tab-ios",    name: "iPad",        icon: "📲" },
+  { id: "laptop",     name: "Laptop",      icon: "💻" },
+  { id: "pc",         name: "PC Desktop",  icon: "🖥️" },
+];
+
+const SERVICE_CATS = [
+  { id: "lcd",     name: "LCD / Layar",        icon: "🖼️" },
+  { id: "battery", name: "Baterai",            icon: "🔋" },
+  { id: "board",   name: "Mesin / Mainboard",  icon: "🔧" },
+  { id: "soft",    name: "Software / OS",      icon: "💿" },
+  { id: "charger", name: "Port / Charger",     icon: "🔌" },
+  { id: "camera",  name: "Kamera",             icon: "📷" },
+  { id: "speaker", name: "Speaker / Audio",    icon: "🔊" },
+  { id: "water",   name: "Kemasukan Air",      icon: "💧" },
+  { id: "other",   name: "Lainnya",            icon: "🛠️" },
+];
+
+const SERVICE_CATALOG = [
+  { id: "s01", name: "Ganti LCD iPhone 11",         cat: "lcd",     price: 850000, warranty: 30, durasi: "2 jam" },
+  { id: "s02", name: "Ganti LCD iPhone 13",         cat: "lcd",     price: 1750000,warranty: 30, durasi: "2 jam" },
+  { id: "s03", name: "Ganti LCD Samsung A-series",  cat: "lcd",     price: 550000, warranty: 30, durasi: "1 jam" },
+  { id: "s04", name: "Ganti LCD Xiaomi Redmi",      cat: "lcd",     price: 450000, warranty: 30, durasi: "1 jam" },
+  { id: "s05", name: "Ganti Baterai iPhone",        cat: "battery", price: 400000, warranty: 60, durasi: "45 menit" },
+  { id: "s06", name: "Ganti Baterai Android",       cat: "battery", price: 250000, warranty: 60, durasi: "45 menit" },
+  { id: "s07", name: "Ganti Baterai Laptop",        cat: "battery", price: 650000, warranty: 90, durasi: "1 jam" },
+  { id: "s08", name: "Service Mainboard HP",        cat: "board",   price: 500000, warranty: 14, durasi: "1-3 hari" },
+  { id: "s09", name: "Service Motherboard Laptop",  cat: "board",   price: 850000, warranty: 14, durasi: "2-5 hari" },
+  { id: "s10", name: "Install Ulang Windows",       cat: "soft",    price: 150000, warranty: 7,  durasi: "1 jam" },
+  { id: "s11", name: "Install Ulang macOS",         cat: "soft",    price: 200000, warranty: 7,  durasi: "1-2 jam" },
+  { id: "s12", name: "Flash / Unlock Android",      cat: "soft",    price: 150000, warranty: 7,  durasi: "1 jam" },
+  { id: "s13", name: "Ganti Konektor Charger",      cat: "charger", price: 200000, warranty: 30, durasi: "1 jam" },
+  { id: "s14", name: "Ganti Kamera Belakang",       cat: "camera",  price: 350000, warranty: 30, durasi: "1 jam" },
+  { id: "s15", name: "Service Speaker",             cat: "speaker", price: 150000, warranty: 30, durasi: "45 menit" },
+  { id: "s16", name: "Cuci / Bersih Kemasukan Air", cat: "water",   price: 300000, warranty: 0,  durasi: "1-2 hari" },
+  { id: "s17", name: "Ganti Keyboard Laptop",       cat: "other",   price: 450000, warranty: 30, durasi: "1-2 jam" },
+  { id: "s18", name: "Upgrade SSD Laptop",          cat: "other",   price: 250000, warranty: 14, durasi: "1 jam" },
+];
+
+const PRODUCT_CATS = [
+  { id: "spare",  name: "Sparepart",  icon: "🔧" },
+  { id: "acc",    name: "Aksesoris",  icon: "🎧" },
+  { id: "cable",  name: "Kabel",      icon: "🔌" },
+  { id: "case",   name: "Casing",     icon: "📱" },
+  { id: "power",  name: "Charger",    icon: "🔋" },
+  { id: "audio",  name: "Audio",      icon: "🎵" },
+];
+
+const INIT_PRODUCTS = [
+  { id: "p01", name: "LCD iPhone 11 Original",       cat: "spare", stock: 8,  price: 950000, modal: 650000, img: "📱", supplier: "sup1", barcode: "8991234560011" },
+  { id: "p02", name: "LCD Samsung A52",              cat: "spare", stock: 5,  price: 550000, modal: 380000, img: "📱", supplier: "sup1", barcode: "8991234560012" },
+  { id: "p03", name: "Baterai iPhone 12",            cat: "spare", stock: 15, price: 280000, modal: 180000, img: "🔋", supplier: "sup2", barcode: "8991234560013" },
+  { id: "p04", name: "Baterai Laptop HP Pavilion",   cat: "spare", stock: 3,  price: 650000, modal: 450000, img: "🔋", supplier: "sup2", barcode: "8991234560014" },
+  { id: "p05", name: "Konektor Charger Type-C",      cat: "spare", stock: 25, price: 75000,  modal: 45000,  img: "🔌", supplier: "sup1", barcode: "8991234560015" },
+  { id: "p06", name: "Kabel Charger USB-C 1m",       cat: "cable", stock: 40, price: 35000,  modal: 18000,  img: "🔌", supplier: "sup3", barcode: "8991234560016" },
+  { id: "p07", name: "Kabel Lightning 1m",           cat: "cable", stock: 28, price: 45000,  modal: 22000,  img: "🔌", supplier: "sup3", barcode: "8991234560017" },
+  { id: "p08", name: "Charger 20W Type-C",           cat: "power", stock: 22, price: 85000,  modal: 50000,  img: "🔌", supplier: "sup3", barcode: "8991234560018" },
+  { id: "p09", name: "Tempered Glass iPhone 13",     cat: "acc",   stock: 50, price: 25000,  modal: 8000,   img: "🛡️", supplier: "sup3", barcode: "8991234560019" },
+  { id: "p10", name: "Casing Samsung A52 Soft",      cat: "case",  stock: 15, price: 45000,  modal: 18000,  img: "📱", supplier: "sup3", barcode: "8991234560020" },
+  { id: "p11", name: "Earphone Bluetooth TWS",       cat: "audio", stock: 12, price: 175000, modal: 95000,  img: "🎧", supplier: "sup3", barcode: "8991234560021" },
+  { id: "p12", name: "Powerbank 10000mAh",           cat: "power", stock: 8,  price: 165000, modal: 100000, img: "🔋", supplier: "sup3", barcode: "8991234560022" },
+];
+
+const INIT_SUPPLIERS = [
+  { id: "sup1", name: "PT Spare Mandiri",     phone: "021-5551-1001", addr: "Glodok, Jakarta Barat" },
+  { id: "sup2", name: "CV Battery Indonesia", phone: "021-5551-1002", addr: "Mangga Dua, Jakarta" },
+  { id: "sup3", name: "Toko Aksesoris HP",    phone: "021-5551-1003", addr: "ITC Roxy, Jakarta" },
+];
+
+const INIT_TECHNICIANS = [
+  { id: "t01", name: "Budi Santoso",    branch: "b1", spec: "HP & Tablet",   phone: "0812-1111-1001", rating: 4.8, done: 142 },
+  { id: "t02", name: "Ahmad Rizki",     branch: "b1", spec: "Laptop & PC",   phone: "0812-1111-1002", rating: 4.9, done: 98 },
+  { id: "t03", name: "Dedi Kurniawan",  branch: "b2", spec: "iPhone Expert", phone: "0812-1111-1003", rating: 4.9, done: 205 },
+  { id: "t04", name: "Wawan Hermawan",  branch: "b2", spec: "HP Android",    phone: "0812-1111-1004", rating: 4.7, done: 87 },
+  { id: "t05", name: "Eko Prasetyo",    branch: "b3", spec: "Laptop Master", phone: "0812-1111-1005", rating: 4.8, done: 121 },
+  { id: "t06", name: "Fajar Nugroho",   branch: "b3", spec: "Mainboard BGA", phone: "0812-1111-1006", rating: 5.0, done: 76 },
+];
+
+const STATUS = [
+  { id: "masuk",     label: "Masuk",      color: "#64748b" },
+  { id: "antri",     label: "Antri",      color: "#f59e0b" },
+  { id: "diagnosa",  label: "Diagnosa",   color: "#3b82f6" },
+  { id: "menunggu",  label: "Tunggu ACC", color: "#a855f7" },
+  { id: "repair",    label: "Pengerjaan", color: "#06b6d4" },
+  { id: "selesai",   label: "Selesai",    color: "#10b981" },
+  { id: "ambil",     label: "Diambil",    color: "#22c55e" },
+  { id: "batal",     label: "Batal",      color: "#ef4444" },
+];
+
+const PAY_METHODS = [
+  { id: "cash",     name: "Tunai",        icon: "💵" },
+  { id: "qris",     name: "QRIS",         icon: "📱" },
+  { id: "transfer", name: "Transfer",     icon: "🏦" },
+  { id: "gopay",    name: "GoPay",        icon: "💚" },
+  { id: "ovo",      name: "OVO",          icon: "💜" },
+  { id: "dana",     name: "DANA",         icon: "💙" },
+  { id: "shopeepay",name: "ShopeePay",    icon: "🧡" },
+  { id: "debit",    name: "Kartu Debit",  icon: "💳" },
+];
+
+const INIT_USERS = [
+  { id: "u1", username: "owner",  password: "owner123",  name: "Sopian Hadianto", role: "OWNER",     active: true, branch: "all" },
+  { id: "u2", username: "admin",  password: "admin123",  name: "Admin Pusat",     role: "ADMIN",     active: true, branch: "b1" },
+  { id: "u3", username: "kasir1", password: "kasir123",  name: "Rina Kasir",      role: "KASIR",     active: true, branch: "b1" },
+  { id: "u4", username: "tek1",   password: "tek123",    name: "Budi Teknisi",    role: "TEKNISI",   active: true, branch: "b1" },
+];
+
+const INIT_CUSTOMERS = [
+  { id: "c01", name: "Rina Wulandari", phone: "081234567890", email: "rina@mail.com",  address: "Depok" },
+  { id: "c02", name: "Hendra Wijaya",  phone: "081234567891", email: "hendra@mail.com", address: "Pamulang" },
+  { id: "c03", name: "Siti Aminah",    phone: "081234567892", email: "siti@mail.com",  address: "BSD" },
+];
+
+const now = Date.now();
+const INIT_TICKETS = [
+  { id: "TK2604001", branch: "b1", customerId: "c01", custName: "Rina Wulandari", custPhone: "081234567890",
+    device: "hp-ios", brand: "Apple", model: "iPhone 13 Pro", imei: "356789012345678", color: "Graphite",
+    complaint: "Layar retak, touchscreen masih jalan", accessories: "Charger, case", password: "1234",
+    diagnosis: "LCD pecah, perlu ganti LCD original", services: [{ id: "s02", name: "Ganti LCD iPhone 13", price: 1750000 }],
+    parts: [{ id: "p01", name: "LCD iPhone 13", price: 1200000 }], kilat: false,
+    technicianId: "t03", status: "repair", estDone: "16/04/2026", warranty: 30,
+    totalCost: 1750000, dp: 500000, sisa: 1250000, payMethod: "transfer", createdAt: now - 86400000 * 2, notes: "Customer minta cepat" },
+  { id: "TK2604002", branch: "b1", customerId: "c02", custName: "Hendra Wijaya", custPhone: "081234567891",
+    device: "laptop", brand: "Asus", model: "ROG Strix G15", imei: "SN-ASUS-XY72", color: "Black",
+    complaint: "Tidak bisa nyala, indikator charging kedip",
+    diagnosis: "IC power rusak, perlu reball mainboard", services: [{ id: "s09", name: "Service Motherboard", price: 850000 }],
+    parts: [], kilat: false, technicianId: "t02", status: "diagnosa", estDone: "18/04/2026", warranty: 14,
+    totalCost: 850000, dp: 200000, sisa: 650000, payMethod: "cash", createdAt: now - 86400000, notes: "" },
+  { id: "TK2604003", branch: "b2", customerId: "c03", custName: "Siti Aminah", custPhone: "081234567892",
+    device: "hp-android", brand: "Samsung", model: "Galaxy A52", imei: "356789012345679", color: "Violet",
+    complaint: "Baterai boros, sering panas",
+    diagnosis: "Baterai drop, perlu ganti", services: [{ id: "s06", name: "Ganti Baterai Android", price: 250000 }],
+    parts: [], kilat: true, technicianId: "t04", status: "selesai", estDone: "15/04/2026", warranty: 60,
+    totalCost: 250000, dp: 0, sisa: 250000, payMethod: "qris", createdAt: now - 86400000 * 3, notes: "Sudah ditest OK" },
+  { id: "TK2604004", branch: "b3", customerId: "c01", custName: "Rina Wulandari", custPhone: "081234567890",
+    device: "tab-ios", brand: "Apple", model: "iPad Air 4", imei: "356789012345680", color: "Space Gray",
+    complaint: "Charging port longgar",
+    diagnosis: "", services: [], parts: [], kilat: false, technicianId: "", status: "antri", estDone: "17/04/2026", warranty: 30,
+    totalCost: 0, dp: 0, sisa: 0, payMethod: "", createdAt: now - 3600000 * 5, notes: "" },
+];
+
+const INIT_SALES = [
+  { id: "TR2604001", branch: "b1", customerId: "", custName: "Umum", items: [{ id: "p06", name: "Kabel Charger USB-C 1m", qty: 1, price: 35000 }], total: 35000, payMethod: "cash", payAmt: 50000, change: 15000, createdAt: now - 3600000, cashier: "u3" },
+  { id: "TR2604002", branch: "b1", customerId: "", custName: "Umum", items: [{ id: "p09", name: "Tempered Glass iPhone 13", qty: 2, price: 25000 }], total: 50000, payMethod: "qris", payAmt: 50000, change: 0, createdAt: now - 7200000, cashier: "u3" },
+  { id: "TR2604003", branch: "b2", customerId: "c02", custName: "Hendra Wijaya", items: [{ id: "p11", name: "Earphone Bluetooth TWS", qty: 1, price: 175000 }], total: 175000, payMethod: "cash", payAmt: 200000, change: 25000, createdAt: now - 86400000, cashier: "u3" },
+];
+
+const INIT_PURCHASES = [
+  { id: "PO2604001", branch: "b1", supplierId: "sup1", items: [{ id: "p01", name: "LCD iPhone 11 Original", qty: 5, price: 650000 }], total: 3250000, createdAt: now - 86400000 * 5, notes: "Restock bulanan" },
+  { id: "PO2604002", branch: "b1", supplierId: "sup3", items: [{ id: "p09", name: "Tempered Glass iPhone 13", qty: 50, price: 8000 }, { id: "p06", name: "Kabel Charger USB-C 1m", qty: 30, price: 18000 }], total: 940000, createdAt: now - 86400000 * 3, notes: "" },
+];
+
+// ---------- UTILS ----------
+const rp = (n) => "Rp " + (n || 0).toLocaleString("id-ID");
+const fT = (ts) => new Date(ts).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+const fD = (ts) => new Date(ts).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+const fFull = (ts) => `${fD(ts)} ${fT(ts)}`;
+
+const gid = (pfx = "ID") => {
+  const d = new Date();
+  const y = String(d.getFullYear()).slice(-2);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const rnd = String(Math.floor(Math.random() * 900) + 100);
+  return `${pfx}${y}${m}${dd}${rnd}`;
 };
-const BRANDS = [
-  {n:"Samsung",e:"📱"},{n:"iPhone",e:"🍎"},{n:"Xiaomi",e:"🔶"},{n:"OPPO",e:"🟢"},
-  {n:"Vivo",e:"🔵"},{n:"Realme",e:"🟡"},{n:"Huawei",e:"🌸"},{n:"Infinix",e:"⚡"},
-  {n:"POCO",e:"🚀"},{n:"OnePlus",e:"➕"},{n:"ASUS",e:"🎮"},{n:"Lainnya",e:"📞"},
-];
-const DAMAGES = [
-  {n:"LCD Pecah",e:"📺",cat:"Layar"},
-  {n:"Touchscreen Error",e:"👆",cat:"Layar"},
-  {n:"Baterai Drop",e:"🔋",cat:"Power"},
-  {n:"Mati Total",e:"⚫",cat:"Power"},
-  {n:"Charging Error",e:"🔌",cat:"Power"},
-  {n:"Speaker Rusak",e:"🔊",cat:"Audio"},
-  {n:"Mic Tidak Berfungsi",e:"🎤",cat:"Audio"},
-  {n:"Kamera Error",e:"📷",cat:"Optik"},
-  {n:"Software/Hang",e:"💾",cat:"Software"},
-  {n:"Lupa Password",e:"🔐",cat:"Software"},
-  {n:"Water Damage",e:"💧",cat:"Fisik"},
-  {n:"Tombol Rusak",e:"🔘",cat:"Fisik"},
-  {n:"Sinyal Hilang",e:"📡",cat:"Network"},
-  {n:"WiFi/Bluetooth",e:"📶",cat:"Network"},
-  {n:"Lainnya",e:"⚙️",cat:"Lain"},
-];
-const COLORS = ["Hitam","Putih","Biru","Hijau","Merah","Gold","Silver","Ungu","Pink","Abu-abu","Lainnya"];
-const KONDISI = [{n:"Mulus",e:"✨"},{n:"Lecet Ringan",e:"🔸"},{n:"Lecet Berat",e:"🔶"},{n:"Retak",e:"⚠️"},{n:"Penyok",e:"🔻"}];
-const KELENGKAPAN = ["Charger","Kabel Data","Dus/Box","SIM Card","Memory Card","Case/Casing","Screen Guard","Headset","Stylus"];
-const PRIORITAS = [
-  {v:"Normal",e:"🟢",c:"#10B981",d:"3-5 hari"},
-  {v:"Urgent",e:"🟡",c:"#F59E0B",d:"1-2 hari"},
-  {v:"Express",e:"🔴",c:"#EF4444",d:"Hari ini"},
-];
-const TEKNISI = [
-  {n:"Pak Budi",e:"👨‍🔧",sp:"Hardware"},
-  {n:"Pak Eko",e:"👨‍💻",sp:"Software"},
-  {n:"Pak Andi",e:"👨‍🔬",sp:"Board"},
-  {n:"Pak Reza",e:"🧑‍🔧",sp:"LCD"},
-  {n:"Bu Sari",e:"👩‍💼",sp:"Front Desk"},
-];
 
-const DEMO = [
-  {id:"SRV001",namaCustomer:"Ahmad Fadli",noHP:"081234567890",email:"ahmad@mail.com",alamat:"Jl. Melati No.12, Ciputat",merkHP:"Samsung",tipeHP:"Galaxy A54",warnaHP:"Hitam",imei:"354678091234567",kondisi:"Lecet Ringan",kelengkapan:"Charger,Kabel Data",kerusakan:"LCD Pecah",keluhan:"Layar retak setelah jatuh",prioritas:"Urgent",status:"Proses",biayaEstimasi:450000,uangMuka:200000,teknisi:"Pak Budi",passwordHP:"1234",garansi:"Tidak",tglEstSelesai:"2026-04-18",tanggalMasuk:"2026-04-14",catatan:"Sparepart sudah dipesan",rating:0},
-  {id:"SRV002",namaCustomer:"Siti Rahma",noHP:"085678901234",email:"siti@mail.com",alamat:"Jl. Kenanga No.5, Pamulang",merkHP:"iPhone",tipeHP:"iPhone 13",warnaHP:"Putih",imei:"490154203237518",kondisi:"Mulus",kelengkapan:"Charger,Dus/Box,Case/Casing",kerusakan:"Baterai Drop",keluhan:"Health 72%",prioritas:"Normal",status:"Selesai",biayaEstimasi:600000,uangMuka:300000,teknisi:"Pak Eko",passwordHP:"Face ID",garansi:"Ya",tglEstSelesai:"2026-04-15",tanggalMasuk:"2026-04-12",catatan:"Original Apple",rating:5},
-  {id:"SRV003",namaCustomer:"Budi Santoso",noHP:"087890123456",email:"",alamat:"Jl. Dahlia No.8, Serpong",merkHP:"Xiaomi",tipeHP:"Redmi Note 12",warnaHP:"Biru",imei:"",kondisi:"Lecet Berat",kelengkapan:"Charger",kerusakan:"Mati Total",keluhan:"Kena air hujan",prioritas:"Express",status:"Diagnosa",biayaEstimasi:0,uangMuka:50000,teknisi:"Pak Andi",passwordHP:"Pola",garansi:"Tidak",tglEstSelesai:"",tanggalMasuk:"2026-04-15",catatan:"Cek mesin",rating:0},
-  {id:"SRV004",namaCustomer:"Dewi Putri",noHP:"089012345678",email:"dewi@mail.com",alamat:"Jl. Anggrek No.3, BSD",merkHP:"OPPO",tipeHP:"Reno 10",warnaHP:"Gold",imei:"867530012345678",kondisi:"Mulus",kelengkapan:"Charger,SIM Card",kerusakan:"Charging Error",keluhan:"Port longgar",prioritas:"Normal",status:"Diterima",biayaEstimasi:150000,uangMuka:0,teknisi:"",passwordHP:"",garansi:"Ya",tglEstSelesai:"2026-04-19",tanggalMasuk:"2026-04-15",catatan:"",rating:0},
-  {id:"SRV005",namaCustomer:"Rudi Hartono",noHP:"081345678901",email:"",alamat:"Jl. Mawar No.20, Pondok Aren",merkHP:"Vivo",tipeHP:"V29",warnaHP:"Ungu",imei:"",kondisi:"Lecet Ringan",kelengkapan:"Charger,Case/Casing",kerusakan:"Kamera Error",keluhan:"Blur tidak fokus",prioritas:"Urgent",status:"Proses",biayaEstimasi:350000,uangMuka:150000,teknisi:"Pak Budi",passwordHP:"5678",garansi:"Tidak",tglEstSelesai:"2026-04-16",tanggalMasuk:"2026-04-13",catatan:"Modul kamera",rating:0},
-  {id:"SRV006",namaCustomer:"Aisyah Nur",noHP:"082567890123",email:"aisyah@mail.com",alamat:"Jl. Flamboyan No.15, Ciputat Timur",merkHP:"Samsung",tipeHP:"Galaxy S23",warnaHP:"Hijau",imei:"352789041234567",kondisi:"Mulus",kelengkapan:"Charger,Kabel Data,Dus/Box,Screen Guard",kerusakan:"Software/Hang",keluhan:"Restart sendiri",prioritas:"Normal",status:"Diambil",biayaEstimasi:200000,uangMuka:100000,teknisi:"Pak Eko",passwordHP:"Pattern",garansi:"Ya",tglEstSelesai:"2026-04-13",tanggalMasuk:"2026-04-10",catatan:"Reset + update",rating:5},
-  {id:"SRV007",namaCustomer:"Yusuf Maulana",noHP:"081567890123",email:"",alamat:"Jl. Kemuning No.7, Bintaro",merkHP:"iPhone",tipeHP:"iPhone 12 Pro",warnaHP:"Silver",imei:"353012345678901",kondisi:"Mulus",kelengkapan:"Charger,Dus/Box",kerusakan:"Touchscreen Error",keluhan:"Layar tidak responsif di sebagian area",prioritas:"Urgent",status:"Selesai",biayaEstimasi:850000,uangMuka:400000,teknisi:"Pak Reza",passwordHP:"Face ID",garansi:"Ya",tglEstSelesai:"2026-04-14",tanggalMasuk:"2026-04-11",catatan:"LCD assembly diganti",rating:4},
-];
-
-/* ═══════════════════════════════════════════════════════
-   HELPERS
-   ═══════════════════════════════════════════════════════ */
-const fmt = d => d ? new Date(d).toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}) : "-";
-const fmtShort = d => d ? new Date(d).toLocaleDateString("id-ID",{day:"2-digit",month:"2-digit"}) : "-";
-const rp = n => (n || n === 0) ? "Rp " + Number(n).toLocaleString("id-ID") : "-";
-const today = () => new Date().toISOString().split("T")[0];
-const greeting = () => {
-  const h = new Date().getHours();
-  if (h < 11) return {t:"Selamat Pagi",e:"☀️"};
-  if (h < 15) return {t:"Selamat Siang",e:"🌤️"};
-  if (h < 18) return {t:"Selamat Sore",e:"🌇"};
-  return {t:"Selamat Malam",e:"🌙"};
-};
-const daysAgo = d => {
-  if (!d) return null;
-  const diff = Math.floor((new Date() - new Date(d)) / 86400000);
-  if (diff === 0) return "Hari ini";
-  if (diff === 1) return "Kemarin";
-  if (diff < 7) return diff + " hari lalu";
-  return fmt(d);
-};
-const initials = n => (n || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
-const colorFromName = n => {
-  const colors = ["#3B82F6","#8B5CF6","#EC4899","#10B981","#F59E0B","#EF4444","#06B6D4","#6366F1"];
-  let h = 0;
-  for (let i = 0; i < (n||"").length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
-  return colors[h % colors.length];
+// 10-char Konter Pro style resi (alphanumeric)
+const genResi = () => {
+  const ch = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let r = "";
+  for (let i = 0; i < 10; i++) r += ch[Math.floor(Math.random() * ch.length)];
+  return r;
 };
 
-/* ═══════════════════════════════════════════════════════
-   STYLES
-   ═══════════════════════════════════════════════════════ */
+const useLS = (key, init) => {
+  const [v, setV] = useState(() => {
+    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : init; }
+    catch { return init; }
+  });
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }, [key, v]);
+  return [v, setV];
+};
+
+const waLink = (phone, text) => {
+  const p = String(phone).replace(/\D/g, "").replace(/^0/, "62");
+  return `https://wa.me/${p}?text=${encodeURIComponent(text)}`;
+};
+
+// CSV export
+const downloadCSV = (filename, rows) => {
+  const csv = rows.map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+};
+
+// SVG QR
+const QR = ({ value, size = 160, dark = "#0f172a", light = "#fff" }) => {
+  const str = String(value);
+  const n = 21;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  const cells = [];
+  for (let i = 0; i < n * n; i++) {
+    const v = Math.abs(((hash * (i + 13)) ^ (i * 7919)) % 97);
+    cells.push(v < 45);
+  }
+  const finder = (r, c) => {
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
+      const idx = (r + i) * n + (c + j);
+      const on = i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4);
+      cells[idx] = on;
+    }
+  };
+  finder(0, 0); finder(0, n - 7); finder(n - 7, 0);
+  const s = size / n;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ background: light, borderRadius: 8 }}>
+      {cells.map((on, i) => on && (
+        <rect key={i} x={(i % n) * s} y={Math.floor(i / n) * s} width={s} height={s} fill={dark} />
+      ))}
+    </svg>
+  );
+};
+
+// ---------- ICONS ----------
+const IX = {
+  dash: "M3 12l9-9 9 9v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2v-9z",
+  pos: "M9 2v6h6V2M3 6v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2z",
+  ticket: "M4 6h16a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H4a2 2 0 01-2-2v-3a2 2 0 000-4V8a2 2 0 012-2z",
+  bolt: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
+  plus: "M12 4v16m-8-8h16",
+  users: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M13 7a4 4 0 11-8 0 4 4 0 018 0zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75",
+  tech: "M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z",
+  box: "M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16zM3.27 6.96L12 12.01l8.73-5.05M12 22.08V12",
+  truck: "M1 3h15v13H1zM16 8h4l3 3v5h-7M5.5 18.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM18.5 18.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z",
+  report: "M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11",
+  cash: "M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6",
+  set: "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z",
+  search: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
+  x: "M18 6L6 18M6 6l12 12",
+  check: "M20 6L9 17l-5-5",
+  chev: "M9 18l6-6-6-6",
+  chevD: "M6 9l6 6 6-6",
+  phone: "M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z",
+  wa: "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z",
+  qr: "M3 11h8V3H3zm2-6h4v4H5zm8-2v8h8V3zm6 6h-4V5h4zM3 21h8v-8H3zm2-6h4v4H5zm14-2h2v2h-2zm-6 0h2v2h-2zm8 4h-2v2h2zm-2 2h-2v2h2zm-2-6h-2v2h2zm-2 2h-2v2h2zm-2 2h-2v2h2zm6 2h-2v4h4v-2h-2z",
+  star: "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z",
+  edit: "M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7m-1.41-9.42a2 2 0 112.83 2.83L11.83 15H9v-2.83z",
+  trash: "M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2",
+  print: "M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z",
+  arrow: "M5 12h14M12 5l7 7-7 7",
+  back: "M19 12H5M12 19l-7-7 7-7",
+  alert: "M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01",
+  download: "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3",
+  upload: "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12",
+  history: "M3 3v5h5M3.05 13A9 9 0 106 5.3L3 8M12 7v5l4 2",
+  sun: "M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z",
+  moon: "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z",
+  logout: "M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9",
+  user: "M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M16 7a4 4 0 11-8 0 4 4 0 018 0z",
+  lock: "M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4",
+  eye: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 100 6 3 3 0 000-6z",
+  bell: "M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0",
+};
+
+const Ic = ({ n, s = 18, c = "currentColor", sw = 2 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+    <path d={IX[n]} />
+  </svg>
+);
+
+// ---------- STYLES ----------
 const CSS = `
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-*::-webkit-scrollbar{display:none}
-body{margin:0}
-@keyframes scaleIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes slideRight{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.85}}
-@keyframes shine{0%{background-position:-200% 0}100%{background-position:200% 0}}
-@keyframes barLoad{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
-@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-@keyframes glow{0%,100%{box-shadow:0 0 20px rgba(59,130,246,0.3)}50%{box-shadow:0 0 30px rgba(59,130,246,0.5)}}
-@keyframes ripple{0%{transform:scale(0);opacity:1}100%{transform:scale(4);opacity:0}}
-input:focus,select:focus,textarea:focus{border-color:#3B82F6!important;box-shadow:0 0 0 4px rgba(59,130,246,0.1)!important}
-.tap:active{transform:scale(0.97);opacity:0.85}
-.btn-primary{background:linear-gradient(135deg,#3B82F6,#6366F1);box-shadow:0 4px 14px rgba(59,130,246,0.35)}
-.btn-success{background:linear-gradient(135deg,#10B981,#059669);box-shadow:0 4px 14px rgba(16,185,129,0.35)}
-.btn-danger{background:linear-gradient(135deg,#EF4444,#DC2626);box-shadow:0 4px 14px rgba(239,68,68,0.35)}
-.skel{background:linear-gradient(90deg,#E2E8F0 0%,#F1F5F9 50%,#E2E8F0 100%);background-size:200% 100%;animation:shine 1.5s infinite}
+:root{
+  --bg:#0a0f1c; --bg2:#0f172a; --panel:#111827; --panel2:#1f2937;
+  --line:#1e293b; --line2:#334155;
+  --txt:#e2e8f0; --txt2:#94a3b8; --txt3:#64748b;
+  --pri:#f97316; --pri2:#ea580c; --pri-glow:rgba(249,115,22,0.25);
+  --acc:#fbbf24; --acc2:#f59e0b;
+  --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --info:#3b82f6;
+  --rad:10px; --rad2:14px;
+}
+[data-theme="light"]{
+  --bg:#f8fafc; --bg2:#f1f5f9; --panel:#fff; --panel2:#f1f5f9;
+  --line:#e2e8f0; --line2:#cbd5e1;
+  --txt:#0f172a; --txt2:#475569; --txt3:#64748b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body,html,#root{background:var(--bg);color:var(--txt);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh}
+.app{display:flex;min-height:100vh;background:linear-gradient(135deg,var(--bg) 0%,var(--bg2) 60%,var(--panel) 100%)}
+[data-theme="light"] .app{background:var(--bg)}
+.app::before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse at top right,rgba(249,115,22,0.08),transparent 50%),radial-gradient(ellipse at bottom left,rgba(251,191,36,0.05),transparent 50%);pointer-events:none;z-index:0}
+[data-theme="light"] .app::before{background:radial-gradient(ellipse at top right,rgba(249,115,22,0.05),transparent 50%)}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#0a0f1c 0%,#1a1f3a 100%);position:relative;overflow:hidden}
+.login-wrap::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 20%,rgba(249,115,22,0.15),transparent 50%),radial-gradient(circle at 70% 80%,rgba(251,191,36,0.1),transparent 50%)}
+.login-card{background:rgba(17,24,39,0.85);backdrop-filter:blur(20px);border:1px solid var(--line2);border-radius:20px;padding:40px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.5);position:relative;z-index:1;color:#e2e8f0}
+.login-logo{width:72px;height:72px;background:linear-gradient(135deg,#f97316,#fbbf24);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 16px;box-shadow:0 10px 30px rgba(249,115,22,0.4)}
+.login-card h1{text-align:center;font-size:24px;font-weight:800;letter-spacing:-0.02em;background:linear-gradient(135deg,#fff,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.login-card .sub{text-align:center;font-size:12px;color:#94a3b8;margin:6px 0 28px}
+
+/* SIDEBAR */
+.sb{width:240px;background:rgba(17,24,39,0.9);backdrop-filter:blur(20px);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 12px;position:sticky;top:0;height:100vh;z-index:10;transition:width 0.25s}
+[data-theme="light"] .sb{background:#fff}
+.sb.col{width:72px;padding:18px 8px}
+.sb.col .nav-itm span,.sb.col .brand-txt,.sb.col .nav-lbl,.sb.col .brch-sel .lbl,.sb.col .brch-sel .nm,.sb.col .user-nm,.sb.col .user-rl{display:none}
+.sb.col .brch-sel,.sb.col .nav-itm{justify-content:center;padding:11px 0}
+.sb.col .user-info{justify-content:center}
+.sb.col .user-info .avatar{margin:0}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.logo{width:38px;height:38px;background:linear-gradient(135deg,var(--pri),var(--acc));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 16px var(--pri-glow);flex-shrink:0}
+.brand-txt h1{font-size:14px;font-weight:800;letter-spacing:-0.02em}
+.brand-txt p{font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:0.12em;font-weight:600}
+.nav{display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto;overflow-x:hidden}
+.nav::-webkit-scrollbar{width:4px}
+.nav::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px}
+.nav-lbl{font-size:9px;color:var(--txt3);padding:8px 10px 4px;text-transform:uppercase;letter-spacing:0.1em;font-weight:700}
+.nav-itm{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:8px;color:var(--txt2);cursor:pointer;transition:all 0.18s;border:none;background:none;font-size:13px;font-weight:500;text-align:left;width:100%;font-family:inherit;white-space:nowrap;overflow:hidden}
+.nav-itm:hover{background:var(--panel2);color:var(--txt)}
+.nav-itm.act{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;box-shadow:0 4px 16px var(--pri-glow)}
+.brch{padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:8px 0}
+.brch-sel{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:all 0.18s}
+.brch-sel:hover{border-color:var(--pri)}
+.brch-sel .lbl{font-size:9px;color:var(--txt3);text-transform:uppercase;font-weight:700;letter-spacing:0.08em}
+.brch-sel .nm{font-size:12px;font-weight:700;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.user-info{display:flex;align-items:center;gap:10px;padding:8px;background:var(--panel2);border-radius:10px;margin-top:8px}
+.user-info .avatar{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--pri),var(--acc));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;flex-shrink:0}
+.user-nm{font-size:12px;font-weight:700;line-height:1.2}
+.user-rl{font-size:9px;color:var(--txt3);text-transform:uppercase;font-weight:700;letter-spacing:0.08em;margin-top:1px}
+
+/* TOPBAR */
+.main{flex:1;display:flex;flex-direction:column;position:relative;z-index:1;min-width:0}
+.tb{background:rgba(17,24,39,0.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5;gap:12px}
+[data-theme="light"] .tb{background:rgba(255,255,255,0.85)}
+.tb-left{display:flex;align-items:center;gap:14px;min-width:0;flex:1}
+.collapse-btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px;cursor:pointer;color:var(--txt2);transition:all 0.18s;display:flex}
+.collapse-btn:hover{color:var(--pri);border-color:var(--pri)}
+.tb-ttl h2{font-size:20px;font-weight:800;letter-spacing:-0.02em;background:linear-gradient(135deg,var(--txt) 0%,var(--pri) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.tb-ttl p{font-size:11px;color:var(--txt3);margin-top:1px}
+.tb-act{display:flex;gap:8px;align-items:center;flex-shrink:0}
+
+/* COMMON */
+.btn{padding:8px 14px;border-radius:8px;border:none;background:var(--panel2);color:var(--txt);cursor:pointer;font-weight:600;font-size:12px;display:inline-flex;align-items:center;gap:7px;transition:all 0.18s;font-family:inherit;white-space:nowrap}
+.btn:hover{background:var(--line2)}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn.pri{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;box-shadow:0 4px 14px var(--pri-glow)}
+.btn.pri:hover{transform:translateY(-1px);box-shadow:0 6px 20px var(--pri-glow)}
+.btn.ok{background:var(--ok);color:#fff}
+.btn.ok:hover{background:#059669}
+.btn.err{background:var(--err);color:#fff}
+.btn.gh{background:transparent;border:1px solid var(--line2)}
+.btn.gh:hover{border-color:var(--pri);color:var(--pri)}
+.btn.wa{background:#25D366;color:#fff}
+.btn.wa:hover{background:#1eb352}
+.btn.sm{padding:6px 10px;font-size:11px}
+.btn.icn{padding:7px;border-radius:7px}
+.cnt{padding:20px;max-width:1400px;width:100%;margin:0 auto}
+.grid{display:grid;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad2);padding:18px;transition:border-color 0.18s}
+.card:hover{border-color:var(--line2)}
+.kpi{background:linear-gradient(135deg,var(--panel) 0%,var(--panel2) 100%);border:1px solid var(--line);border-radius:var(--rad2);padding:18px;position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;top:0;right:0;width:120px;height:120px;background:radial-gradient(circle,var(--pri-glow),transparent 70%);border-radius:50%;transform:translate(40%,-40%)}
+.kpi .lbl{font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:0.08em;font-weight:700}
+.kpi .v{font-size:24px;font-weight:800;margin-top:6px;letter-spacing:-0.02em}
+.kpi .sub{font-size:11px;color:var(--txt2);margin-top:4px}
+.kpi.alt::before{background:radial-gradient(circle,rgba(16,185,129,0.2),transparent 70%)}
+.kpi.alt2::before{background:radial-gradient(circle,rgba(59,130,246,0.2),transparent 70%)}
+.kpi.alt3::before{background:radial-gradient(circle,rgba(251,191,36,0.2),transparent 70%)}
+.kpi.alt4::before{background:radial-gradient(circle,rgba(239,68,68,0.2),transparent 70%)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:11px 10px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--txt3);font-weight:700;border-bottom:1px solid var(--line)}
+.tbl td{padding:11px 10px;border-bottom:1px solid var(--line)}
+.tbl tr:hover td{background:rgba(249,115,22,0.03)}
+.tbl .n{text-align:right;font-variant-numeric:tabular-nums}
+.bdg{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+.inp,.sel,.txa{width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--txt);padding:10px 12px;border-radius:8px;font-size:13px;font-family:inherit;transition:border-color 0.18s}
+[data-theme="light"] .inp,[data-theme="light"] .sel,[data-theme="light"] .txa{background:#fff}
+.inp:focus,.sel:focus,.txa:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-glow)}
+.fld{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.fld label{font-size:11px;color:var(--txt2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.row{display:flex;gap:12px}
+.row>*{flex:1}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.mbox{background:var(--panel);border:1px solid var(--line2);border-radius:16px;max-width:720px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.mhd{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--panel);z-index:2}
+.mhd h3{font-size:17px;font-weight:800;letter-spacing:-0.01em}
+.mbd{padding:20px 22px}
+.mft{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:var(--panel);position:sticky;bottom:0}
+.close{background:none;border:none;color:var(--txt2);cursor:pointer;padding:4px;border-radius:6px}
+.close:hover{background:var(--panel2);color:var(--txt)}
+.tck{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad2);padding:14px;cursor:pointer;transition:all 0.18s;position:relative;overflow:hidden}
+.tck:hover{border-color:var(--pri);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+.tck.kilat{border-left:4px solid var(--acc)}
+.tck-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px}
+.tck-id{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--txt3);font-weight:700;letter-spacing:0.05em}
+.tck-dev{font-size:14px;font-weight:700;margin:4px 0 2px}
+.tck-cust{font-size:11px;color:var(--txt2)}
+.tck-cmp{font-size:12px;color:var(--txt2);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);line-height:1.4}
+.tck-ft{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--txt3)}
+.step{display:flex;align-items:center;gap:8px;padding:12px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);cursor:pointer;transition:all 0.18s;flex:1;min-width:110px}
+.step:hover{border-color:var(--pri)}
+.step.on{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-color:var(--pri)}
+.step .dot{width:24px;height:24px;border-radius:50%;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.step.on .dot{background:rgba(255,255,255,0.2)}
+.step .lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.tab{padding:10px 16px;border:none;background:none;color:var(--txt2);cursor:pointer;font-weight:600;font-size:13px;border-bottom:2px solid transparent;transition:all 0.18s;white-space:nowrap;font-family:inherit}
+.tab:hover{color:var(--txt)}
+.tab.on{color:var(--pri);border-bottom-color:var(--pri)}
+.chip{display:inline-block;padding:4px 10px;background:var(--panel2);border-radius:999px;font-size:11px;font-weight:600;color:var(--txt2)}
+.stk-low{color:var(--err);font-weight:700}
+.stk-ok{color:var(--ok);font-weight:700}
+.empty{text-align:center;padding:50px 20px;color:var(--txt3)}
+.empty-ic{font-size:40px;margin-bottom:10px;opacity:0.5}
+.avatar{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--pri),var(--acc));display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0}
+.track-hero{background:linear-gradient(135deg,var(--panel) 0%,#1a2436 100%);border:1px solid var(--line2);border-radius:16px;padding:28px;text-align:center;position:relative;overflow:hidden}
+.track-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,var(--pri-glow),transparent 60%)}
+.track-hero>*{position:relative}
+.prog-line{display:flex;align-items:center;gap:8px;margin:20px 0;flex-wrap:wrap}
+.prog-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:60px}
+.prog-step .dot{width:32px;height:32px;border-radius:50%;background:var(--panel2);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--txt3)}
+.prog-step.on .dot{background:var(--pri);border-color:var(--pri);color:#fff;box-shadow:0 0 20px var(--pri-glow)}
+.prog-step.done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+.prog-step .lbl{font-size:10px;color:var(--txt3);text-transform:uppercase;font-weight:700;letter-spacing:0.05em;text-align:center}
+.prog-step.on .lbl,.prog-step.done .lbl{color:var(--txt)}
+.prog-bar{flex:1;height:2px;background:var(--line);min-width:10px}
+.prog-bar.done{background:var(--ok)}
+
+/* POS */
+.pos-wrap{display:grid;grid-template-columns:1fr 380px;gap:14px;height:calc(100vh - 120px)}
+.pos-left{display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.pos-right{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad2);display:flex;flex-direction:column;overflow:hidden}
+.pos-cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.pos-cat{padding:8px 14px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;transition:all 0.18s}
+.pos-cat.on{background:linear-gradient(135deg,var(--pri),var(--pri2));border-color:var(--pri);color:#fff}
+.pos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;overflow-y:auto;padding-right:4px;flex:1}
+.pos-prod{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;transition:all 0.18s;display:flex;flex-direction:column;gap:4px;text-align:center}
+.pos-prod:hover{border-color:var(--pri);transform:translateY(-2px);box-shadow:0 6px 16px rgba(249,115,22,0.15)}
+.pos-prod-img{width:100%;aspect-ratio:1;background:var(--bg2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:6px}
+.pos-prod-nm{font-size:11px;font-weight:700;line-height:1.2;min-height:26px}
+.pos-prod-pr{font-size:13px;color:var(--pri);font-weight:800}
+.pos-prod-st{font-size:9px;color:var(--txt3);text-transform:uppercase}
+.cart-hd{padding:14px 16px;border-bottom:1px solid var(--line)}
+.cart-bd{flex:1;overflow-y:auto;padding:10px 14px}
+.cart-itm{display:flex;gap:8px;padding:8px;border-bottom:1px dashed var(--line);align-items:center}
+.cart-itm:last-child{border-bottom:none}
+.qty-grp{display:flex;align-items:center;gap:4px;background:var(--bg2);border-radius:6px;padding:2px}
+.qty-btn{width:22px;height:22px;border:none;background:var(--panel2);color:var(--txt);border-radius:4px;cursor:pointer;font-weight:800}
+.qty-btn:hover{background:var(--pri);color:#fff}
+.qty-num{min-width:24px;text-align:center;font-weight:700;font-size:12px}
+.cart-ft{padding:14px 16px;border-top:1px solid var(--line);background:var(--bg2)}
+.cart-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0}
+.cart-row.tot{font-size:18px;font-weight:800;padding-top:8px;margin-top:6px;border-top:1px solid var(--line)}
+.cart-row.tot .v{color:var(--pri)}
+
+/* RECEIPT */
+.receipt{font-family:'Courier New',monospace;background:#fff;color:#000;padding:16px;max-width:300px;margin:0 auto;font-size:11px;line-height:1.5}
+.receipt .hd{text-align:center;border-bottom:1px dashed #000;padding-bottom:8px;margin-bottom:8px}
+.receipt .hd h3{font-size:14px;font-weight:800;margin-bottom:2px}
+.receipt .ln{display:flex;justify-content:space-between;margin:2px 0}
+.receipt .div{border-top:1px dashed #000;margin:8px 0}
+.receipt .ft{text-align:center;margin-top:8px;font-size:10px}
+
+@media(max-width:1100px){.pos-wrap{grid-template-columns:1fr}.pos-right{position:fixed;bottom:0;left:0;right:0;height:60vh;z-index:50;border-radius:16px 16px 0 0}}
+@media(max-width:900px){.sb{display:none}.cnt{padding:14px}}
+@media print{.sb,.tb,.btn,.close,.mft{display:none!important}.cnt{padding:0}body{background:#fff;color:#000}.card,.modal,.mbox{border:none;background:#fff;color:#000;box-shadow:none}.mbd{padding:0}}
 `;
 
-/* ═══════════════════════════════════════════════════════
-   ICONS
-   ═══════════════════════════════════════════════════════ */
-function Ico({n, s}) {
-  const sz = s || 20;
-  const p = {viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",width:sz,height:sz};
-  const pf = {viewBox:"0 0 24 24",fill:"currentColor",width:sz,height:sz};
-  const map = {
-    back: <svg {...p}><polyline points="15 18 9 12 15 6"/></svg>,
-    plus: <svg {...{...p,strokeWidth:"2.5"}}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
-    search: <svg {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
-    home: <svg {...p}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-    list: <svg {...p}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
-    chart: <svg {...p}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
-    user: <svg {...p}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-    clock: <svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-    refresh: <svg {...p}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
-    receipt: <svg {...p}><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2-3-2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>,
-    call: <svg {...p}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
-    moon: <svg {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
-    sun: <svg {...p}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
-    chev: <svg {...{...p,strokeWidth:"2.5"}}><polyline points="9 18 15 12 9 6"/></svg>,
-    bell: <svg {...p}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
-    star: <svg {...pf}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
-    starO: <svg {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
-    wa: <svg {...pf}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>,
-    grid: <svg {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
-    settings: <svg {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
-    print: <svg {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>,
-    share: <svg {...p}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
-    check: <svg {...{...p,strokeWidth:"3"}}><polyline points="20 6 9 17 4 12"/></svg>,
-    x: <svg {...{...p,strokeWidth:"2.5"}}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-    trend: <svg {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
-    money: <svg {...p}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
-    qr: <svg {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="14.01"/><line x1="14" y1="17" x2="14" y2="17.01"/><line x1="14" y1="20" x2="17" y2="20"/><line x1="20" y1="14" x2="20" y2="14.01"/><line x1="17" y1="17" x2="20" y2="17"/><line x1="20" y1="20" x2="20" y2="20.01"/></svg>,
-    info: <svg {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
-    fire: <svg {...pf}><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67M11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>,
-    tools: <svg {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
-    apple: <svg {...pf}><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83"/><path d="M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11"/></svg>,
-    android: <svg {...pf}><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.27-.86-.31-.16-.69-.04-.86.27l-1.86 3.22c-1.44-.65-3.06-1.01-4.76-1.01-1.7 0-3.33.36-4.76 1.01L5.07 5.71c-.16-.31-.54-.43-.86-.27-.31.16-.43.55-.27.86L5.78 9.48C2.56 11.22.48 14.06 0 17.4h24c-.48-3.34-2.56-6.18-5.76-7.92zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>,
+// ==========================================================================
+// COMPONENTS
+// ==========================================================================
+
+// ---------- LOGIN ----------
+const LoginPage = ({ users, onLogin }) => {
+  const [u, setU] = useState("");
+  const [p, setP] = useState("");
+  const [show, setShow] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = () => {
+    const usr = users.find((x) => x.username === u && x.password === p && x.active);
+    if (usr) onLogin(usr);
+    else setErr("Username atau password salah");
   };
-  return map[n] || null;
-}
-
-/* ═══════════════════════════════════════════════════════
-   REUSABLE COMPONENTS
-   ═══════════════════════════════════════════════════════ */
-function Avatar({name, size}) {
-  const s = size || 44;
-  const c = colorFromName(name);
-  return <div style={{width:s,height:s,borderRadius:s*0.32,background:`linear-gradient(135deg,${c},${c}CC)`,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:s*0.4,fontWeight:800,flexShrink:0,boxShadow:`0 4px 12px ${c}40`}}>{initials(name)}</div>;
-}
-
-function Badge({s}) {
-  const m = SMAP[s] || SMAP.Diterima;
-  return <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:20,fontSize:11,fontWeight:800,color:m.c,background:m.bg,border:`1px solid ${m.c}25`,flexShrink:0}}><span style={{fontSize:11}}>{m.e}</span> {s}</span>;
-}
-
-function Stars({n}) {
-  return <div style={{display:"flex",gap:2,color:"#F59E0B"}}>{[1,2,3,4,5].map(i => <Ico key={i} n={i <= n ? "star" : "starO"} s={14} />)}</div>;
-}
-
-function Toast({d}) {
-  if (!d) return null;
-  const cfg = {
-    success:{bg:"#ECFDF5",c:"#059669",b:"#A7F3D0",e:"✅"},
-    error:{bg:"#FEF2F2",c:"#DC2626",b:"#FECACA",e:"❌"},
-    info:{bg:"#EFF6FF",c:"#2563EB",b:"#BFDBFE",e:"ℹ️"},
-  }[d.type] || {bg:"#ECFDF5",c:"#059669",b:"#A7F3D0",e:"✅"};
-  return <div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",padding:"12px 20px",borderRadius:16,fontSize:14,fontWeight:700,zIndex:500,boxShadow:"0 10px 30px rgba(0,0,0,0.15)",background:cfg.bg,color:cfg.c,border:`1.5px solid ${cfg.b}`,animation:"scaleIn .3s ease",maxWidth:340,display:"flex",alignItems:"center",gap:8}}><span>{cfg.e}</span> {d.msg}</div>;
-}
-
-function Modal({title, msg, onOk, onNo, okText, danger, icon}) {
-  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center",padding:24,backdropFilter:"blur(6px)",animation:"fadeIn .2s ease"}}>
-    <div style={{background:"#fff",borderRadius:24,width:"100%",maxWidth:340,padding:28,textAlign:"center",animation:"scaleIn .3s ease",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
-      <div style={{fontSize:48,marginBottom:12}}>{icon || (danger ? "⚠️" : "❓")}</div>
-      <div style={{fontSize:19,fontWeight:800,color:"#0F172A",marginBottom:8}}>{title}</div>
-      <div style={{fontSize:14,color:"#64748B",lineHeight:1.6,marginBottom:24}}>{msg}</div>
-      <div style={{display:"flex",gap:10}}>
-        <button onClick={onNo} className="tap" style={{flex:1,padding:13,borderRadius:14,border:"1.5px solid #E2E8F0",background:"#fff",color:"#64748B",fontSize:14,fontWeight:700,cursor:"pointer"}}>Batal</button>
-        <button onClick={onOk} className={"tap " + (danger ? "btn-danger" : "btn-primary")} style={{flex:1,padding:13,borderRadius:14,border:"none",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>{okText || "Ya"}</button>
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <div className="login-logo">🛠️</div>
+        <h1>MAX Mobile Service</h1>
+        <p className="sub">Sistem Manajemen Servis & Point of Sale</p>
+        <div className="fld">
+          <label>Username</label>
+          <input className="inp" value={u} onChange={(e) => { setU(e.target.value); setErr(""); }} placeholder="Masukkan username" onKeyDown={(e) => e.key === "Enter" && submit()} />
+        </div>
+        <div className="fld">
+          <label>Password</label>
+          <div style={{ position: "relative" }}>
+            <input className="inp" type={show ? "text" : "password"} value={p} onChange={(e) => { setP(e.target.value); setErr(""); }} placeholder="Masukkan password" onKeyDown={(e) => e.key === "Enter" && submit()} style={{ paddingRight: 40 }} />
+            <button onClick={() => setShow(!show)} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 6 }}><Ic n="eye" s={16} /></button>
+          </div>
+        </div>
+        {err && <div style={{ color: "#ef4444", fontSize: 12, padding: "8px 12px", background: "rgba(239,68,68,0.1)", borderRadius: 8, marginBottom: 12, textAlign: "center" }}>{err}</div>}
+        <button className="btn pri" onClick={submit} style={{ width: "100%", padding: "12px", fontSize: 14, justifyContent: "center" }}>
+          <Ic n="logout" s={16} c="#fff" /> Masuk
+        </button>
+        <div style={{ textAlign: "center", marginTop: 16, padding: 10, background: "rgba(249,115,22,0.08)", borderRadius: 8, fontSize: 11, color: "#94a3b8" }}>
+          <div style={{ marginBottom: 4, color: "#fbbf24", fontWeight: 700 }}>Default Login</div>
+          <div>owner / owner123 • admin / admin123</div>
+          <div>kasir1 / kasir123 • tek1 / tek123</div>
+        </div>
+        <div style={{ textAlign: "center", marginTop: 18, fontSize: 10, color: "#64748b" }}>MAX Mobile Service — © 2026</div>
       </div>
     </div>
-  </div>;
-}
+  );
+};
 
-function Timeline({current, T}) {
-  const idx = SFLOW.indexOf(current);
-  return <div style={{display:"flex",alignItems:"center",margin:"18px 0 4px",padding:"0 4px"}}>
-    {SFLOW.map((s,i) => {
-      const done = i <= idx, active = i === idx, st = SMAP[s];
-      return <div key={s} style={{display:"flex",alignItems:"center",flex:i < SFLOW.length-1 ? 1 : "none"}}>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"center",zIndex:1}}>
-          <div style={{width:active?38:30,height:active?38:30,borderRadius:"50%",background:done?st.c:"#475569",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .4s cubic-bezier(.34,1.56,.64,1)",boxShadow:active?`0 0 0 5px ${st.bg},0 6px 16px ${st.c}50`:"none",fontSize:active?15:11,color:"#fff",fontWeight:800,animation:active?"pulse 2s ease infinite":"none"}}>{done?(active?st.e:"✓"):String(i+1)}</div>
-          <div style={{fontSize:9,fontWeight:700,color:done?st.c:"#64748B",marginTop:5,whiteSpace:"nowrap"}}>{s}</div>
+// ---------- SIDEBAR ----------
+const Sidebar = ({ page, setPage, branch, setBranchModal, user, onLogout, collapsed }) => {
+  const b = BRANCHES.find((x) => x.id === branch);
+  const navs = [
+    { l: "MENU UTAMA" },
+    { id: "dash",    n: "dash",    t: "Dashboard" },
+    { id: "pos",     n: "pos",     t: "Kasir (POS)" },
+    { id: "ticket",  n: "ticket",  t: "Servis" },
+    { id: "kilat",   n: "bolt",    t: "Servis Kilat" },
+    { l: "MANAJEMEN" },
+    { id: "inv",     n: "box",     t: "Inventaris" },
+    { id: "supplier",n: "truck",   t: "Supplier" },
+    { id: "cust",    n: "users",   t: "Pelanggan" },
+    { id: "tech",    n: "tech",    t: "Teknisi" },
+    { l: "LAPORAN" },
+    { id: "history", n: "history", t: "Riwayat" },
+    { id: "report",  n: "report",  t: "Laporan" },
+    { id: "track",   n: "qr",      t: "Tracking Publik" },
+    { id: "setting", n: "set",     t: "Pengaturan" },
+  ];
+  return (
+    <aside className={`sb ${collapsed ? "col" : ""}`}>
+      <div className="brand">
+        <div className="logo">🛠️</div>
+        <div className="brand-txt">
+          <h1>MAX Mobile Service</h1>
+          <p>v2.0 Enterprise</p>
         </div>
-        {i < SFLOW.length-1 && <div style={{flex:1,height:3,background:i < idx ? (SMAP[SFLOW[i+1]] || {}).c : "#475569",borderRadius:2,margin:"0 4px 16px",transition:"all .4s"}} />}
-      </div>;
-    })}
-  </div>;
-}
-
-function Skeleton({h, mb}) {
-  return <div className="skel" style={{height:h||80,borderRadius:16,marginBottom:mb||10}} />;
-}
-
-function Empty({icon, title, msg, action, onAction}) {
-  return <div style={{textAlign:"center",padding:"60px 24px",animation:"fadeUp .4s ease"}}>
-    <div style={{fontSize:64,marginBottom:16,opacity:0.8}}>{icon || "📱"}</div>
-    <div style={{fontSize:18,fontWeight:800,color:"#0F172A",marginBottom:6}}>{title}</div>
-    <div style={{fontSize:14,color:"#64748B",lineHeight:1.6,marginBottom:action?20:0}}>{msg}</div>
-    {action && <button onClick={onAction} className="tap btn-primary" style={{padding:"12px 28px",borderRadius:14,border:"none",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>{action}</button>}
-  </div>;
-}
-
-/* ═══════════════════════════════════════════════════════
-   NOTA / RECEIPT MODAL
-   ═══════════════════════════════════════════════════════ */
-function Nota({item, onClose}) {
-  const sisa = (Number(item.biayaEstimasi)||0) - (Number(item.uangMuka)||0);
-  function sendWA() {
-    const t = `📋 *NOTA SERVICE*
-━━━━━━━━━━━━
-🆔 ${item.id}
-📅 ${fmt(item.tanggalMasuk)}
-━━━━━━━━━━━━
-👤 *${item.namaCustomer}*
-📞 ${item.noHP}
-${item.alamat ? "📍 " + item.alamat + "\n" : ""}━━━━━━━━━━━━
-📱 *Perangkat*
-${item.merkHP} ${item.tipeHP||""} (${item.warnaHP||"-"})
-IMEI: ${item.imei||"-"}
-Kondisi: ${item.kondisi||"-"}
-Kelengkapan: ${item.kelengkapan||"-"}
-━━━━━━━━━━━━
-🔧 *Service*
-Kerusakan: ${item.kerusakan}
-Prioritas: ${item.prioritas||"Normal"}
-Status: ${item.status} ${(SMAP[item.status]||{}).e}
-Teknisi: ${item.teknisi||"-"}
-${item.tglEstSelesai ? "Est. Selesai: " + fmt(item.tglEstSelesai) + "\n" : ""}━━━━━━━━━━━━
-💰 *Biaya*
-Estimasi: ${rp(item.biayaEstimasi)}
-DP: ${rp(item.uangMuka)}
-*Sisa: ${rp(sisa)}*
-━━━━━━━━━━━━
-_Terima kasih atas kepercayaan Anda!_
-🔧 *MAX Mobile Service*`;
-    window.open(`https://wa.me/${(item.noHP||"").replace(/^0/,"62")}?text=${encodeURIComponent(t)}`,"_blank");
-  }
-  function copyId() {
-    navigator.clipboard.writeText(item.id);
-    alert("ID disalin: " + item.id);
-  }
-  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(6px)",animation:"fadeIn .2s ease"}}>
-    <div style={{background:"#fff",borderRadius:24,width:"100%",maxWidth:380,maxHeight:"90vh",overflow:"auto",animation:"scaleIn .3s ease"}}>
-      <div style={{background:"linear-gradient(135deg,#0F172A,#1E293B,#334155)",color:"#fff",padding:"24px",borderRadius:"24px 24px 0 0",textAlign:"center",position:"relative"}}>
-        <div onClick={onClose} style={{position:"absolute",top:14,right:14,cursor:"pointer",padding:8,borderRadius:10,background:"rgba(255,255,255,0.15)"}}><Ico n="x" s={18}/></div>
-        <div style={{fontSize:32,marginBottom:6}}>🧾</div>
-        <div style={{fontSize:20,fontWeight:800}}>Nota Service</div>
-        <div style={{fontSize:12,color:"#94A3B8",marginTop:4}}>MAX Mobile Service</div>
       </div>
-      <div style={{padding:24}}>
-        <div onClick={copyId} className="tap" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,padding:"12px 16px",background:"linear-gradient(135deg,#EFF6FF,#F5F3FF)",borderRadius:14,cursor:"pointer",border:"1.5px dashed #3B82F6"}}>
-          <div>
-            <div style={{fontSize:10,color:"#64748B",fontWeight:700,letterSpacing:"1px"}}>ID SERVICE</div>
-            <div style={{fontWeight:800,fontSize:16,color:"#3B82F6"}}>{item.id}</div>
+      <nav className="nav">
+        {navs.map((nv, i) => nv.l
+          ? <div key={i} className="nav-lbl">{nv.l}</div>
+          : <button key={nv.id} className={`nav-itm ${page === nv.id ? "act" : ""}`} onClick={() => setPage(nv.id)} title={nv.t}>
+              <Ic n={nv.n} /><span>{nv.t}</span>
+            </button>
+        )}
+      </nav>
+      <div className="brch">
+        <div className="brch-sel" onClick={() => setBranchModal(true)} title={b?.name}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="lbl">Cabang</div>
+            <div className="nm">{b?.name || "—"}</div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#3B82F6",fontWeight:700}}><Ico n="qr" s={20}/></div>
+          <Ic n="chev" s={14} />
         </div>
+      </div>
+      <div className="user-info">
+        <div className="avatar">{user.name.split(" ").map(w => w[0]).slice(0, 2).join("")}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="user-nm">{user.name}</div>
+          <div className="user-rl">{user.role}</div>
+        </div>
+        <button className="close" onClick={onLogout} title="Logout"><Ic n="logout" s={16} /></button>
+      </div>
+    </aside>
+  );
+};
 
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:10,color:"#94A3B8",fontWeight:800,letterSpacing:"1px",marginBottom:6}}>👤 CUSTOMER</div>
-          <div style={{padding:"10px 14px",background:"#F8FAFC",borderRadius:12}}>
-            <div style={{fontWeight:700,fontSize:14,color:"#0F172A"}}>{item.namaCustomer}</div>
-            <div style={{fontSize:13,color:"#64748B",marginTop:2}}>{item.noHP}</div>
-          </div>
-        </div>
-
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:10,color:"#94A3B8",fontWeight:800,letterSpacing:"1px",marginBottom:6}}>📱 PERANGKAT</div>
-          <div style={{padding:"10px 14px",background:"#F8FAFC",borderRadius:12}}>
-            <div style={{fontWeight:700,fontSize:14,color:"#0F172A"}}>{item.merkHP} {item.tipeHP}</div>
-            <div style={{fontSize:12,color:"#64748B",marginTop:2}}>{item.warnaHP} • {item.kondisi || "-"}</div>
-            {item.imei && <div style={{fontSize:11,color:"#94A3B8",marginTop:2,fontFamily:"monospace"}}>IMEI: {item.imei}</div>}
-          </div>
-        </div>
-
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:10,color:"#94A3B8",fontWeight:800,letterSpacing:"1px",marginBottom:6}}>🔧 KERUSAKAN</div>
-          <div style={{padding:"10px 14px",background:"#FEF2F2",borderRadius:12}}>
-            <div style={{fontWeight:700,fontSize:14,color:"#DC2626"}}>{item.kerusakan}</div>
-            {item.keluhan && <div style={{fontSize:12,color:"#64748B",marginTop:4,lineHeight:1.5}}>{item.keluhan}</div>}
-          </div>
-        </div>
-
-        <div style={{padding:18,background:"linear-gradient(135deg,#0F172A,#1E293B)",borderRadius:14,color:"#fff"}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:13}}><span style={{color:"#94A3B8"}}>Estimasi</span><span style={{fontWeight:700}}>{rp(item.biayaEstimasi)}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:10,fontSize:13}}><span style={{color:"#94A3B8"}}>DP Dibayar</span><span style={{fontWeight:700,color:"#34D399"}}>- {rp(item.uangMuka)}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",paddingTop:10,borderTop:"1.5px dashed #475569"}}><span style={{fontWeight:800}}>Sisa Bayar</span><span style={{fontSize:18,fontWeight:900,color:sisa > 0 ? "#FBBF24" : "#34D399"}}>{rp(sisa)}</span></div>
-        </div>
-
-        <div style={{marginTop:20,display:"flex",gap:10}}>
-          <button onClick={sendWA} className="tap" style={{flex:2,padding:13,borderRadius:14,border:"none",background:"#25D366",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 4px 14px rgba(37,211,102,0.35)"}}><Ico n="wa" s={18}/> Kirim Nota</button>
-          <button onClick={() => window.print()} className="tap" style={{flex:1,padding:13,borderRadius:14,border:"1.5px solid #E2E8F0",background:"#fff",color:"#334155",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ico n="print" s={16}/> Cetak</button>
-        </div>
+const TopBar = ({ title, subtitle, actions, onCollapse, theme, setTheme }) => (
+  <div className="tb">
+    <div className="tb-left">
+      <button className="collapse-btn" onClick={onCollapse}><Ic n="dash" s={16} /></button>
+      <div className="tb-ttl">
+        <h2>{title}</h2>
+        {subtitle && <p>{subtitle}</p>}
       </div>
     </div>
-  </div>;
-}
-
-/* ═══════════════════════════════════════════════════════
-   MAIN APP
-   ═══════════════════════════════════════════════════════ */
-export default function App() {
-  const [splash, setSplash] = useState(true);
-  const [dark, setDark] = useState(false);
-  const [tab, setTab] = useState("home"); // home | list | board | stats | more
-  const [page, setPage] = useState("main"); // main | detail | form | customer | settings
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [spinning, setSpinning] = useState(false);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("Semua");
-  const [sortBy, setSortBy] = useState("newest");
-  const [viewMode, setViewMode] = useState("list"); // list | grid
-  const [sel, setSel] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [modal, setModal] = useState(null);
-  const [nota, setNota] = useState(null);
-  const [step, setStep] = useState(0);
-  const [shopName, setShopName] = useState("MAX Mobile Service");
-  const initFd = {namaCustomer:"",noHP:"",email:"",alamat:"",merkHP:"",tipeHP:"",warnaHP:"",imei:"",kondisi:"",kelengkapan:[],kerusakan:"",keluhan:"",prioritas:"Normal",biayaEstimasi:"",uangMuka:"",teknisi:"",passwordHP:"",garansi:"",tglEstSelesai:"",catatan:""};
-  const [fd, setFd] = useState(initFd);
-  const [errs, setErrs] = useState({});
-
-  useEffect(() => {
-    try {
-      const s = localStorage.getItem(SETTINGS_KEY);
-      if (s) {
-        const obj = JSON.parse(s);
-        if (obj.dark !== undefined) setDark(obj.dark);
-        if (obj.shopName) setShopName(obj.shopName);
-      }
-    } catch {}
-    const t = setTimeout(() => setSplash(false), 1800);
-    return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({dark, shopName})); } catch {}
-  }, [dark, shopName]);
-
-  function flash(msg, type) { setToast({msg,type:type||"success"}); setTimeout(() => setToast(null), 3200); }
-
-  const fetchData = useCallback((silent) => {
-    if (!silent) setLoading(true); else setSpinning(true);
-    if (!hasSupabase) {
-      try {
-        const cached = localStorage.getItem(STORAGE_KEY);
-        if (cached) setData(JSON.parse(cached));
-        else setData(DEMO);
-      } catch { setData(DEMO); }
-      setLoading(false); setSpinning(false);
-      return;
-    }
-    supabase.from("services").select("*").order("created_at", {ascending:false}).then(res => {
-      if (res.error || !res.data || !res.data.length) throw new Error("empty");
-      setData(res.data);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data)); } catch {}
-    }).catch(() => {
-      try {
-        const cached = localStorage.getItem(STORAGE_KEY);
-        if (cached) setData(JSON.parse(cached));
-        else setData(DEMO);
-      } catch { setData(DEMO); }
-    }).finally(() => { setLoading(false); setSpinning(false); });
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  /* ── DERIVED ── */
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    let r = data.filter(d => {
-      const ms = !q || (d.namaCustomer||"").toLowerCase().indexOf(q) >= 0 || (d.id||"").toLowerCase().indexOf(q) >= 0 || (d.merkHP||"").toLowerCase().indexOf(q) >= 0 || (d.noHP||"").indexOf(q) >= 0 || (d.tipeHP||"").toLowerCase().indexOf(q) >= 0 || (d.kerusakan||"").toLowerCase().indexOf(q) >= 0;
-      const mf = filter === "Semua" || d.status === filter;
-      return ms && mf;
-    });
-    if (sortBy === "newest") r.sort((a,b) => (b.tanggalMasuk||"").localeCompare(a.tanggalMasuk||""));
-    else if (sortBy === "oldest") r.sort((a,b) => (a.tanggalMasuk||"").localeCompare(b.tanggalMasuk||""));
-    else if (sortBy === "priority") {
-      const order = {Express:0,Urgent:1,Normal:2};
-      r.sort((a,b) => (order[a.prioritas]||9) - (order[b.prioritas]||9));
-    }
-    else if (sortBy === "biaya") r.sort((a,b) => (Number(b.biayaEstimasi)||0) - (Number(a.biayaEstimasi)||0));
-    return r;
-  }, [data, search, filter, sortBy]);
-
-  const stats = useMemo(() => {
-    const t = today();
-    const isMonth = d => d && d.startsWith(t.slice(0,7));
-    return {
-      total: data.length,
-      proses: data.filter(d => d.status === "Proses" || d.status === "Diagnosa").length,
-      selesai: data.filter(d => d.status === "Selesai").length,
-      hari: data.filter(d => d.tanggalMasuk === t).length,
-      revToday: data.filter(d => d.tanggalMasuk === t).reduce((a,b) => a + (Number(b.biayaEstimasi)||0), 0),
-      revMonth: data.filter(d => isMonth(d.tanggalMasuk) && (d.status === "Selesai" || d.status === "Diambil")).reduce((a,b) => a + (Number(b.biayaEstimasi)||0), 0),
-      pendapatan: data.filter(d => d.status === "Selesai" || d.status === "Diambil").reduce((a,b) => a + (Number(b.biayaEstimasi)||0), 0),
-      piutang: data.filter(d => d.status !== "Batal").reduce((a,b) => a + Math.max(0, (Number(b.biayaEstimasi)||0) - (Number(b.uangMuka)||0)), 0),
-      avgRating: (() => {
-        const rated = data.filter(d => Number(d.rating) > 0);
-        return rated.length ? (rated.reduce((a,b) => a + Number(b.rating), 0) / rated.length).toFixed(1) : 0;
-      })(),
-      ratedCount: data.filter(d => Number(d.rating) > 0).length,
-      // Top brands
-      topBrands: (() => {
-        const m = {};
-        data.forEach(d => { if (d.merkHP) m[d.merkHP] = (m[d.merkHP]||0) + 1; });
-        return Object.entries(m).sort((a,b) => b[1] - a[1]).slice(0,5);
-      })(),
-      // Top damages
-      topDamages: (() => {
-        const m = {};
-        data.forEach(d => { if (d.kerusakan) m[d.kerusakan] = (m[d.kerusakan]||0) + 1; });
-        return Object.entries(m).sort((a,b) => b[1] - a[1]).slice(0,5);
-      })(),
-      // Top teknisi
-      topTeknisi: (() => {
-        const m = {};
-        data.forEach(d => { if (d.teknisi) m[d.teknisi] = (m[d.teknisi]||0) + 1; });
-        return Object.entries(m).sort((a,b) => b[1] - a[1]).slice(0,5);
-      })(),
-      // Last 7 days trend
-      weekTrend: (() => {
-        const arr = [];
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date();
-          d.setDate(d.getDate() - i);
-          const ds = d.toISOString().split("T")[0];
-          arr.push({date:ds, count:data.filter(x => x.tanggalMasuk === ds).length, label:d.toLocaleDateString("id-ID",{weekday:"short"})});
-        }
-        return arr;
-      })(),
-    };
-  }, [data]);
-
-  // Customer DB (unique by phone)
-  const customers = useMemo(() => {
-    const m = {};
-    data.forEach(d => {
-      if (!d.noHP) return;
-      if (!m[d.noHP]) m[d.noHP] = {noHP:d.noHP,nama:d.namaCustomer,email:d.email,alamat:d.alamat,visits:0,total:0,lastVisit:null};
-      m[d.noHP].visits++;
-      m[d.noHP].total += (Number(d.biayaEstimasi)||0);
-      if (!m[d.noHP].lastVisit || d.tanggalMasuk > m[d.noHP].lastVisit) m[d.noHP].lastVisit = d.tanggalMasuk;
-    });
-    return Object.values(m).sort((a,b) => b.visits - a.visits);
-  }, [data]);
-
-  /* ── FORM ── */
-  function validate(s) {
-    const e = {};
-    if (s === 0) {
-      if (!fd.namaCustomer.trim()) e.namaCustomer = "Nama wajib diisi";
-      if (!fd.noHP.trim()) e.noHP = "No. HP wajib diisi";
-      else if (!/^08\d{8,12}$/.test(fd.noHP.trim())) e.noHP = "Format: 08xxxxxxxxxx";
-    }
-    if (s === 1) { if (!fd.merkHP) e.merkHP = "Pilih merk HP"; }
-    if (s === 2) { if (!fd.kerusakan) e.kerusakan = "Pilih kerusakan"; }
-    setErrs(e); return Object.keys(e).length === 0;
-  }
-
-  function submitForm() {
-    if (!validate(3)) return;
-    setLoading(true);
-    const send = Object.assign({}, fd, {kelengkapan:(fd.kelengkapan||[]).join(",")});
-    const payload = {
-      namaCustomer: send.namaCustomer, noHP: send.noHP, alamat: send.alamat || null,
-      merkHP: send.merkHP || null, tipeHP: send.tipeHP || null, warnaHP: send.warnaHP || null,
-      imei: send.imei || null, kondisi: send.kondisi || null, kelengkapan: send.kelengkapan || null,
-      kerusakan: send.kerusakan || null, keluhan: send.keluhan || null,
-      prioritas: send.prioritas || "Normal", status: "Diterima",
-      biayaEstimasi: Number(send.biayaEstimasi) || 0, uangMuka: Number(send.uangMuka) || 0,
-      teknisi: send.teknisi || null, passwordHP: send.passwordHP || null,
-      garansi: send.garansi || "Tidak", tglEstSelesai: send.tglEstSelesai || null,
-      tanggalMasuk: today(), catatan: send.catatan || null,
-    };
-    const done = () => {
-      setFd(initFd); setStep(0); setPage("main"); setTab("home"); setLoading(false);
-      fetchData(true);
-    };
-    if (!hasSupabase) {
-      const ni = Object.assign({}, payload, {id:"SRV" + String(data.length + 1).padStart(3,"0"), rating:0});
-      const newData = [ni].concat(data);
-      setData(newData);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(newData)); } catch {}
-      flash("Tersimpan (offline mode) 📱");
-      done();
-      return;
-    }
-    supabase.from("services").insert([payload]).select().then(res => {
-      if (res.error) flash("Gagal menyimpan: " + res.error.message, "error");
-      else flash("Service order berhasil ditambahkan! 🎉");
-    }).catch(() => {
-      flash("Gagal menyimpan ke server", "error");
-    }).finally(done);
-  }
-
-  function updStatus(item, ns) {
-    setModal(null);
-    const newData = data.map(d => d.id === item.id ? Object.assign({}, d, {status:ns}) : d);
-    setData(newData);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(newData)); } catch {}
-    setSel(Object.assign({}, item, {status:ns}));
-    flash(`Status diubah → ${(SMAP[ns]||{}).e} ${ns}`);
-    if (hasSupabase) {
-      supabase.from("services").update({status: ns}).eq("id", item.id).then(() => {});
-    }
-  }
-
-  function rateItem(item, r) {
-    const newData = data.map(d => d.id === item.id ? Object.assign({}, d, {rating:r}) : d);
-    setData(newData);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(newData)); } catch {}
-    setSel(Object.assign({}, item, {rating:r}));
-    flash(`Rating ${r} bintang ⭐`, "info");
-  }
-
-  /* ── THEME ── */
-  const T = dark
-    ? {bg:"#0B1120",bg2:"#0F172A",card:"#1E293B",cb:"#334155",text:"#F1F5F9",ts:"#94A3B8",tm:"#64748B",ib:"#1E293B",ib2:"#334155",hbg:"linear-gradient(135deg,#020617,#0F172A,#1E293B)",dv:"#334155",chip:"#1E293B"}
-    : {bg:"#F1F5F9",bg2:"#F8FAFC",card:"#FFFFFF",cb:"#E2E8F0",text:"#0F172A",ts:"#64748B",tm:"#94A3B8",ib:"#FAFBFC",ib2:"#E2E8F0",hbg:"linear-gradient(135deg,#0F172A,#1E293B,#334155)",dv:"#F1F5F9",chip:"#F1F5F9"};
-
-  const base = {fontFamily:"'SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:T.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",position:"relative",paddingBottom:"env(safe-area-inset-bottom)"};
-  const inp = f => ({width:"100%",padding:"14px 16px",borderRadius:14,border:`1.5px solid ${errs[f]?"#EF4444":T.ib2}`,fontSize:16,color:T.text,background:T.ib,outline:"none",fontFamily:"inherit",transition:"all .2s"});
-
-  /* ═══ SPLASH ═══ */
-  if (splash) return <div style={Object.assign({}, base, {background:"linear-gradient(145deg,#0F172A,#1E293B,#334155)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:"#fff"})}>
-    <style>{CSS}</style>
-    <div style={{width:200,height:110,borderRadius:20,overflow:"hidden",boxShadow:"0 20px 60px rgba(56,189,248,0.4)",animation:"pulse 2.4s ease infinite",marginBottom:24,border:"1.5px solid rgba(56,189,248,0.25)"}}><img src={logo} alt="MAX Mobile Service" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></div>
-    <div style={{fontSize:28,fontWeight:900,letterSpacing:"2px",animation:"fadeUp .6s ease .3s both"}}>MAX MOBILE</div>
-    <div style={{fontSize:12,color:"#94A3B8",fontWeight:700,letterSpacing:"4px",textTransform:"uppercase",marginTop:6,animation:"fadeUp .6s ease .5s both"}}>Apple & Android Service</div>
-    <div style={{marginTop:48,width:220,height:3,borderRadius:4,background:"rgba(255,255,255,0.1)",overflow:"hidden",animation:"fadeUp .6s ease .7s both"}}>
-      <div style={{width:"60%",height:"100%",borderRadius:4,background:"linear-gradient(90deg,#38BDF8,#818CF8,#A78BFA)",animation:"barLoad 1.5s ease infinite"}} />
+    <div className="tb-act">
+      {actions}
+      <button className="btn icn gh" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="Toggle theme">
+        <Ic n={theme === "dark" ? "sun" : "moon"} s={15} />
+      </button>
     </div>
-  </div>;
+  </div>
+);
 
-  /* ═══ DETAIL ═══ */
-  if (page === "detail" && sel) {
-    const ci = SFLOW.indexOf(sel.status);
-    const ns = ci < SFLOW.length - 1 ? SFLOW[ci+1] : null;
-    const sisa = (Number(sel.biayaEstimasi)||0) - (Number(sel.uangMuka)||0);
-    const dmg = DAMAGES.find(d => d.n === sel.kerusakan);
-    const pri = PRIORITAS.find(p => p.v === sel.prioritas) || PRIORITAS[0];
+const StatusBadge = ({ st }) => {
+  const s = STATUS.find((x) => x.id === st) || STATUS[0];
+  return <span className="bdg" style={{ background: s.color + "22", color: s.color, border: `1px solid ${s.color}44` }}>{s.label}</span>;
+};
 
-    return <div style={base}>
-      <style>{CSS}</style>
-      <div style={{background:T.hbg,color:"#fff",padding:"14px 18px 22px",position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",top:-60,right:-60,width:180,height:180,borderRadius:"50%",background:`radial-gradient(circle,${pri.c}30,transparent 70%)`}} />
-        <div style={{display:"flex",alignItems:"center",gap:12,position:"relative",zIndex:1}}>
-          <div onClick={() => {setPage("main"); setSel(null);}} className="tap" style={{cursor:"pointer",padding:8,borderRadius:12,background:"rgba(255,255,255,0.12)"}}><Ico n="back"/></div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:11,color:"#94A3B8",fontWeight:700,letterSpacing:"1px"}}>SERVICE DETAIL</div>
-            <div style={{fontSize:18,fontWeight:800,marginTop:1}}>{sel.id}</div>
-          </div>
-          <div onClick={() => setNota(sel)} className="tap" style={{cursor:"pointer",padding:10,borderRadius:12,background:"rgba(255,255,255,0.12)"}}><Ico n="receipt" s={18}/></div>
-        </div>
-        <Timeline current={sel.status} T={T}/>
-        <div style={{textAlign:"center",fontSize:12,color:"#94A3B8",marginTop:6,fontWeight:600}}>{(SMAP[sel.status]||{}).txt}</div>
-      </div>
-
-      <div style={{padding:"16px 16px 120px"}}>
-        {/* Quick Actions */}
-        <div style={{display:"flex",gap:10,marginBottom:16,animation:"fadeUp .3s ease"}}>
-          <button onClick={() => window.open("tel:"+sel.noHP)} className="tap" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px",borderRadius:14,border:`1px solid ${T.cb}`,background:T.card,color:T.text,fontSize:11,fontWeight:700,cursor:"pointer"}}><div style={{color:"#3B82F6"}}><Ico n="call" s={20}/></div>Telepon</button>
-          <button onClick={() => window.open("https://wa.me/"+(sel.noHP||"").replace(/^0/,"62"),"_blank")} className="tap" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px",borderRadius:14,border:"none",background:"#25D366",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(37,211,102,0.3)"}}><Ico n="wa" s={20}/>WhatsApp</button>
-          <button onClick={() => setNota(sel)} className="tap" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px",borderRadius:14,border:`1px solid ${T.cb}`,background:T.card,color:T.text,fontSize:11,fontWeight:700,cursor:"pointer"}}><div style={{color:"#8B5CF6"}}><Ico n="receipt" s={20}/></div>Nota</button>
-          <button onClick={() => window.open("https://maps.google.com/?q="+encodeURIComponent(sel.alamat||""))} className="tap" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px",borderRadius:14,border:`1px solid ${T.cb}`,background:T.card,color:T.text,fontSize:11,fontWeight:700,cursor:"pointer"}}><div style={{color:"#EF4444"}}>📍</div>Lokasi</button>
-        </div>
-
-        {/* Customer */}
-        <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:12,border:`1px solid ${T.cb}`,animation:"fadeUp .3s ease .05s both"}}>
-          <div style={{fontSize:10,color:T.tm,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:12}}>👤 CUSTOMER</div>
-          <div style={{display:"flex",alignItems:"center",gap:14}}>
-            <Avatar name={sel.namaCustomer} size={54}/>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:18,fontWeight:800,color:T.text}}>{sel.namaCustomer}</div>
-              <div style={{fontSize:13,color:T.ts,marginTop:2}}>{sel.noHP}</div>
-              {sel.email && <div style={{fontSize:12,color:T.tm,marginTop:2}}>✉️ {sel.email}</div>}
-              {sel.alamat && <div style={{fontSize:12,color:T.tm,marginTop:4,lineHeight:1.4}}>📍 {sel.alamat}</div>}
-            </div>
-          </div>
-        </div>
-
-        {/* Device */}
-        <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:12,border:`1px solid ${T.cb}`,animation:"fadeUp .3s ease .1s both"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-            <div style={{fontSize:10,color:T.tm,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.5px"}}>📱 PERANGKAT</div>
-            <span style={{fontSize:10,fontWeight:800,padding:"3px 8px",borderRadius:6,background:`${pri.c}20`,color:pri.c}}>{pri.e} {pri.v}</span>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
-            <div style={{width:50,height:50,borderRadius:14,background:`linear-gradient(135deg,#3B82F620,#3B82F610)`,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #3B82F620"}}>
-              <Ico n={sel.merkHP === "iPhone" ? "apple" : "android"} s={24}/>
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:17,fontWeight:800,color:T.text}}>{sel.merkHP} {sel.tipeHP}</div>
-              <div style={{fontSize:13,color:T.ts,marginTop:2}}>{sel.warnaHP || "-"} • {sel.kondisi || "-"}</div>
-            </div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:8}}>
-            <div style={{padding:"10px 12px",background:T.bg2,borderRadius:10}}>
-              <div style={{fontSize:10,color:T.tm,fontWeight:700,marginBottom:2}}>IMEI/SN</div>
-              <div style={{fontSize:13,fontWeight:700,color:T.text,fontFamily:"monospace"}}>{sel.imei || "-"}</div>
-            </div>
-            <div style={{padding:"10px 12px",background:T.bg2,borderRadius:10}}>
-              <div style={{fontSize:10,color:T.tm,fontWeight:700,marginBottom:2}}>GARANSI</div>
-              <div style={{fontSize:13,fontWeight:700,color:sel.garansi === "Ya" ? "#10B981" : "#EF4444"}}>{sel.garansi === "Ya" ? "✅ Aktif" : "❌ Habis"}</div>
-            </div>
-          </div>
-          {sel.kelengkapan && <div style={{padding:"10px 12px",background:T.bg2,borderRadius:10}}>
-            <div style={{fontSize:10,color:T.tm,fontWeight:700,marginBottom:4}}>KELENGKAPAN</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-              {sel.kelengkapan.split(",").map(k => <span key={k} style={{fontSize:11,padding:"3px 8px",borderRadius:6,background:"#10B98120",color:"#059669",fontWeight:700}}>✓ {k.trim()}</span>)}
-            </div>
-          </div>}
-        </div>
-
-        {/* Damage */}
-        <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:12,border:`1px solid ${T.cb}`,animation:"fadeUp .3s ease .15s both"}}>
-          <div style={{fontSize:10,color:T.tm,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:12}}>🔧 KERUSAKAN</div>
-          <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px",background:"linear-gradient(135deg,#FEF2F2,#FEE2E2)",borderRadius:14,border:"1.5px solid #FECACA"}}>
-            <div style={{fontSize:32}}>{(dmg||{}).e || "🔧"}</div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:16,fontWeight:800,color:"#DC2626"}}>{sel.kerusakan}</div>
-              {dmg && <div style={{fontSize:11,color:"#991B1B",fontWeight:600,marginTop:2}}>Kategori: {dmg.cat}</div>}
-            </div>
-          </div>
-          {sel.keluhan && <div style={{marginTop:12,padding:"12px 14px",background:T.bg2,borderRadius:12,fontSize:14,color:T.text,lineHeight:1.6}}>"{sel.keluhan}"</div>}
-        </div>
-
-        {/* Finance */}
-        <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:12,border:`1px solid ${T.cb}`,animation:"fadeUp .3s ease .2s both"}}>
-          <div style={{fontSize:10,color:T.tm,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:12}}>💰 BIAYA</div>
-          <div style={{display:"flex",gap:10,marginBottom:12}}>
-            {[["Estimasi",rp(sel.biayaEstimasi),"#3B82F6"],["DP",rp(sel.uangMuka),"#10B981"]].map((r,i) => (
-              <div key={i} style={{flex:1,padding:"12px",background:T.bg2,borderRadius:12,textAlign:"center"}}>
-                <div style={{fontSize:10,color:T.tm,fontWeight:700,marginBottom:4}}>{r[0]}</div>
-                <div style={{fontSize:14,fontWeight:800,color:r[2]}}>{r[1]}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{padding:"14px",background:`linear-gradient(135deg,${sisa>0?"#FEF2F2":"#ECFDF5"},${sisa>0?"#FEE2E2":"#D1FAE5"})`,borderRadius:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:13,color:sisa>0?"#991B1B":"#065F46",fontWeight:800}}>{sisa>0?"💸 Sisa Bayar":"✅ Lunas"}</span>
-            <span style={{fontSize:20,fontWeight:900,color:sisa>0?"#DC2626":"#059669"}}>{rp(Math.max(0,sisa))}</span>
-          </div>
-        </div>
-
-        {/* Service Info */}
-        <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:12,border:`1px solid ${T.cb}`,animation:"fadeUp .3s ease .25s both"}}>
-          <div style={{fontSize:10,color:T.tm,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:12}}>👨‍🔧 SERVICE INFO</div>
-          {[
-            ["Teknisi",sel.teknisi || "Belum ditentukan",sel.teknisi?"#3B82F6":T.tm],
-            ["Tgl Masuk",fmt(sel.tanggalMasuk) + " (" + (daysAgo(sel.tanggalMasuk)||"-") + ")",T.text],
-            ["Est. Selesai",sel.tglEstSelesai?fmt(sel.tglEstSelesai):"Belum ditentukan",T.text],
-            ["Password","🔒 " + (sel.passwordHP || "Tidak ada"),T.text],
-          ].map((r,i) => <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:i<3?`1px solid ${T.dv}`:"none"}}>
-            <span style={{fontSize:12,color:T.tm,fontWeight:700}}>{r[0]}</span>
-            <span style={{fontSize:13,fontWeight:700,color:r[2],textAlign:"right",maxWidth:"60%"}}>{r[1]}</span>
-          </div>)}
-          {sel.catatan && <div style={{marginTop:12,padding:"10px 12px",background:"#FFFBEB",borderRadius:10,borderLeft:"3px solid #F59E0B"}}>
-            <div style={{fontSize:10,color:"#92400E",fontWeight:800,marginBottom:3}}>📝 CATATAN</div>
-            <div style={{fontSize:13,color:"#78350F",lineHeight:1.5}}>{sel.catatan}</div>
-          </div>}
-        </div>
-
-        {/* Rating (only for selesai/diambil) */}
-        {(sel.status === "Selesai" || sel.status === "Diambil") && <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:12,border:`1px solid ${T.cb}`,animation:"fadeUp .3s ease .3s both"}}>
-          <div style={{fontSize:10,color:T.tm,fontWeight:800,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:12}}>⭐ RATING CUSTOMER</div>
-          <div style={{textAlign:"center"}}>
-            <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:8}}>
-              {[1,2,3,4,5].map(i => <div key={i} onClick={() => rateItem(sel,i)} className="tap" style={{cursor:"pointer",color:i<=Number(sel.rating)?"#F59E0B":"#CBD5E1"}}><Ico n={i<=Number(sel.rating)?"star":"starO"} s={32}/></div>)}
-            </div>
-            <div style={{fontSize:13,color:T.ts,fontWeight:600}}>{Number(sel.rating)>0?`${sel.rating} dari 5 bintang`:"Tap untuk beri rating"}</div>
-          </div>
-        </div>}
-
-        {/* Actions */}
-        <div style={{animation:"fadeUp .3s ease .35s both"}}>
-          {ns && <button onClick={() => setModal({title:`Update ke ${ns}?`,msg:`Status akan diubah dari "${sel.status}" ke "${ns}". Customer akan menerima notifikasi.`,onOk:() => updStatus(sel,ns),okText:`✓ ${ns}`,icon:(SMAP[ns]||{}).e})} className="tap btn-primary" style={{width:"100%",padding:16,borderRadius:16,border:"none",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            {(SMAP[ns]||{}).e} Lanjut ke {ns} <Ico n="chev" s={16}/>
-          </button>}
-          {sel.status !== "Batal" && sel.status !== "Diambil" && <button onClick={() => setModal({title:"Batalkan service?",msg:`Yakin ingin membatalkan service ${sel.id}?`,onOk:() => updStatus(sel,"Batal"),okText:"Ya, Batalkan",danger:true})} className="tap" style={{width:"100%",padding:14,borderRadius:14,border:"1.5px solid #FECACA",background:"#FEF2F2",color:"#EF4444",fontSize:14,fontWeight:700,cursor:"pointer"}}>
-            ❌ Batalkan Service
-          </button>}
-        </div>
-      </div>
-
-      {nota && <Nota item={nota} onClose={() => setNota(null)}/>}
-      {modal && <Modal {...modal} onNo={() => setModal(null)}/>}
-      <Toast d={toast}/>
-    </div>;
-  }
-
-  /* ═══ FORM WIZARD ═══ */
-  if (page === "form") {
-    const stps = [
-      {n:"Customer",e:"👤"},
-      {n:"Perangkat",e:"📱"},
-      {n:"Kerusakan",e:"🔧"},
-      {n:"Biaya",e:"💰"},
-    ];
-    return <div style={base}>
-      <style>{CSS}</style>
-      <div style={{background:T.hbg,color:"#fff",padding:"14px 18px 24px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
-          <div onClick={() => {setPage("main"); setTab("home"); setStep(0); setErrs({}); setFd(initFd);}} className="tap" style={{cursor:"pointer",padding:8,borderRadius:12,background:"rgba(255,255,255,0.12)"}}><Ico n="back"/></div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:11,color:"#94A3B8",fontWeight:700,letterSpacing:"1px"}}>STEP {step+1}/4</div>
-            <div style={{fontSize:18,fontWeight:800,marginTop:1}}>{stps[step].e} {stps[step].n}</div>
-          </div>
-        </div>
-        <div style={{display:"flex",gap:6}}>
-          {stps.map((s,i) => <div key={i} style={{flex:1,height:5,borderRadius:6,background:i<=step?"linear-gradient(90deg,#38BDF8,#818CF8)":"rgba(255,255,255,0.15)",transition:"all .4s",boxShadow:i===step?"0 0 12px rgba(56,189,248,0.5)":"none"}}/>)}
-        </div>
-      </div>
-
-      <div style={{padding:"24px 18px 130px"}}>
-        {step === 0 && <div style={{animation:"fadeUp .25s ease"}}>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Nama Customer <span style={{color:"#EF4444"}}>*</span></label>
-            <input style={inp("namaCustomer")} placeholder="cth: Ahmad Fadli" value={fd.namaCustomer} onChange={e => setFd(p => Object.assign({},p,{namaCustomer:e.target.value}))}/>
-            {errs.namaCustomer && <div style={{fontSize:12,color:"#EF4444",marginTop:6,fontWeight:600}}>⚠️ {errs.namaCustomer}</div>}
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>No. HP / WhatsApp <span style={{color:"#EF4444"}}>*</span></label>
-            <input style={inp("noHP")} placeholder="08xxxxxxxxxx" type="tel" value={fd.noHP} onChange={e => setFd(p => Object.assign({},p,{noHP:e.target.value}))}/>
-            {errs.noHP && <div style={{fontSize:12,color:"#EF4444",marginTop:6,fontWeight:600}}>⚠️ {errs.noHP}</div>}
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Email (opsional)</label>
-            <input style={inp("")} placeholder="email@domain.com" type="email" value={fd.email} onChange={e => setFd(p => Object.assign({},p,{email:e.target.value}))}/>
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Alamat</label>
-            <textarea style={Object.assign({},inp(""),{minHeight:80,resize:"vertical"})} placeholder="Alamat lengkap customer..." value={fd.alamat} onChange={e => setFd(p => Object.assign({},p,{alamat:e.target.value}))}/>
-          </div>
-          {/* Quick fill from customer DB */}
-          {customers.length > 0 && fd.namaCustomer.length === 0 && <div style={{marginTop:20,padding:14,background:T.bg2,borderRadius:14,border:`1px dashed ${T.cb}`}}>
-            <div style={{fontSize:11,color:T.tm,fontWeight:800,marginBottom:8,letterSpacing:"1px"}}>💡 CUSTOMER LANGGANAN</div>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {customers.slice(0,3).map(c => <div key={c.noHP} onClick={() => setFd(p => Object.assign({},p,{namaCustomer:c.nama,noHP:c.noHP,email:c.email||"",alamat:c.alamat||""}))} className="tap" style={{padding:"10px 12px",background:T.card,borderRadius:10,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:700,color:T.text}}>{c.nama}</div>
-                  <div style={{fontSize:11,color:T.tm}}>{c.noHP} • {c.visits}x kunjungan</div>
-                </div>
-                <Ico n="chev" s={14}/>
-              </div>)}
-            </div>
-          </div>}
-        </div>}
-
-        {step === 1 && <div style={{animation:"fadeUp .25s ease"}}>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Merk HP <span style={{color:"#EF4444"}}>*</span></label>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-              {BRANDS.map(b => <div key={b.n} onClick={() => {setFd(p => Object.assign({},p,{merkHP:b.n})); setErrs(e => {const n=Object.assign({},e); delete n.merkHP; return n;});}} className="tap" style={{padding:"14px 8px",borderRadius:14,fontSize:12,fontWeight:700,cursor:"pointer",textAlign:"center",background:fd.merkHP===b.n?"linear-gradient(135deg,#3B82F6,#6366F1)":T.chip,color:fd.merkHP===b.n?"#fff":T.ts,boxShadow:fd.merkHP===b.n?"0 4px 12px rgba(59,130,246,0.3)":"none",transition:"all .2s"}}>
-                <div style={{fontSize:22,marginBottom:4}}>{b.e}</div>{b.n}
-              </div>)}
-            </div>
-            {errs.merkHP && <div style={{fontSize:12,color:"#EF4444",marginTop:8,fontWeight:600}}>⚠️ {errs.merkHP}</div>}
-          </div>
-          <div style={{display:"flex",gap:12,marginBottom:18}}>
-            <div style={{flex:1.5}}>
-              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Tipe HP</label>
-              <input style={inp("")} placeholder="cth: Galaxy A54" value={fd.tipeHP} onChange={e => setFd(p => Object.assign({},p,{tipeHP:e.target.value}))}/>
-            </div>
-            <div style={{flex:1}}>
-              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Warna</label>
-              <select style={Object.assign({},inp(""),{appearance:"auto"})} value={fd.warnaHP} onChange={e => setFd(p => Object.assign({},p,{warnaHP:e.target.value}))}>
-                <option value="">Pilih</option>
-                {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>IMEI / SN</label>
-            <input style={inp("")} placeholder="cth: 354678091234567" value={fd.imei} onChange={e => setFd(p => Object.assign({},p,{imei:e.target.value}))}/>
-            <div style={{fontSize:11,color:T.tm,marginTop:4}}>💡 Dial *#06# untuk cek IMEI</div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Kondisi Fisik</label>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {KONDISI.map(k => <div key={k.n} onClick={() => setFd(p => Object.assign({},p,{kondisi:k.n}))} className="tap" style={{padding:"10px 14px",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",background:fd.kondisi===k.n?"linear-gradient(135deg,#8B5CF6,#6366F1)":T.chip,color:fd.kondisi===k.n?"#fff":T.ts,display:"flex",alignItems:"center",gap:5}}>
-                <span>{k.e}</span> {k.n}
-              </div>)}
-            </div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Kelengkapan ({(fd.kelengkapan||[]).length} item)</label>
-            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-              {KELENGKAPAN.map(k => {
-                const sel2 = (fd.kelengkapan||[]).indexOf(k) >= 0;
-                return <div key={k} onClick={() => setFd(p => {const arr=p.kelengkapan||[]; return Object.assign({},p,{kelengkapan:sel2?arr.filter(x=>x!==k):arr.concat([k])});})} className="tap" style={{padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",background:sel2?"linear-gradient(135deg,#10B981,#059669)":T.chip,color:sel2?"#fff":T.ts,display:"flex",alignItems:"center",gap:4}}>
-                  {sel2 && "✓ "}{k}
-                </div>;
-              })}
-            </div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>🔒 Password / Pola Kunci</label>
-            <input style={inp("")} placeholder="Untuk testing teknisi (opsional)" value={fd.passwordHP} onChange={e => setFd(p => Object.assign({},p,{passwordHP:e.target.value}))}/>
-          </div>
-        </div>}
-
-        {step === 2 && <div style={{animation:"fadeUp .25s ease"}}>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Jenis Kerusakan <span style={{color:"#EF4444"}}>*</span></label>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
-              {DAMAGES.map(d => <div key={d.n} onClick={() => {setFd(p => Object.assign({},p,{kerusakan:d.n})); setErrs(e => {const n=Object.assign({},e); delete n.kerusakan; return n;});}} className="tap" style={{padding:"12px 10px",borderRadius:12,fontSize:12,fontWeight:700,cursor:"pointer",background:fd.kerusakan===d.n?"linear-gradient(135deg,#EF4444,#F97316)":T.chip,color:fd.kerusakan===d.n?"#fff":T.ts,display:"flex",alignItems:"center",gap:6}}>
-                <span style={{fontSize:18}}>{d.e}</span>{d.n}
-              </div>)}
-            </div>
-            {errs.kerusakan && <div style={{fontSize:12,color:"#EF4444",marginTop:8,fontWeight:600}}>⚠️ {errs.kerusakan}</div>}
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Keluhan Detail</label>
-            <textarea style={Object.assign({},inp(""),{minHeight:90,resize:"vertical"})} placeholder="Jelaskan secara detail..." value={fd.keluhan} onChange={e => setFd(p => Object.assign({},p,{keluhan:e.target.value}))}/>
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Prioritas Service</label>
-            <div style={{display:"flex",gap:10}}>
-              {PRIORITAS.map(pr => <div key={pr.v} onClick={() => setFd(p => Object.assign({},p,{prioritas:pr.v}))} className="tap" style={{flex:1,padding:"14px 8px",borderRadius:14,textAlign:"center",cursor:"pointer",background:fd.prioritas===pr.v?`linear-gradient(135deg,${pr.c},${pr.c}DD)`:T.chip,color:fd.prioritas===pr.v?"#fff":pr.c,fontWeight:800,boxShadow:fd.prioritas===pr.v?`0 4px 14px ${pr.c}50`:"none"}}>
-                <div style={{fontSize:24,marginBottom:4}}>{pr.e}</div>
-                <div style={{fontSize:13}}>{pr.v}</div>
-                <div style={{fontSize:10,opacity:0.85,marginTop:2}}>{pr.d}</div>
-              </div>)}
-            </div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Status Garansi</label>
-            <div style={{display:"flex",gap:10}}>
-              {[{v:"Ya",e:"✅",c:"#10B981",t:"Masih Garansi"},{v:"Tidak",e:"❌",c:"#EF4444",t:"Habis Garansi"}].map(g => <div key={g.v} onClick={() => setFd(p => Object.assign({},p,{garansi:g.v}))} className="tap" style={{flex:1,padding:"14px",borderRadius:14,textAlign:"center",cursor:"pointer",background:fd.garansi===g.v?`linear-gradient(135deg,${g.c},${g.c}DD)`:T.chip,color:fd.garansi===g.v?"#fff":g.c,fontWeight:800,fontSize:14}}>
-                {g.e} {g.t}
-              </div>)}
-            </div>
-          </div>
-        </div>}
-
-        {step === 3 && <div style={{animation:"fadeUp .25s ease"}}>
-          <div style={{display:"flex",gap:12,marginBottom:18}}>
-            <div style={{flex:1}}>
-              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Estimasi Biaya</label>
-              <input style={inp("")} placeholder="0" type="number" value={fd.biayaEstimasi} onChange={e => setFd(p => Object.assign({},p,{biayaEstimasi:e.target.value}))}/>
-              <div style={{fontSize:11,color:T.tm,marginTop:4,fontWeight:700}}>{rp(fd.biayaEstimasi||0)}</div>
-            </div>
-            <div style={{flex:1}}>
-              <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Uang Muka (DP)</label>
-              <input style={inp("")} placeholder="0" type="number" value={fd.uangMuka} onChange={e => setFd(p => Object.assign({},p,{uangMuka:e.target.value}))}/>
-              <div style={{fontSize:11,color:T.tm,marginTop:4,fontWeight:700}}>{rp(fd.uangMuka||0)}</div>
-            </div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Pilih Teknisi</label>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
-              {TEKNISI.map(t => <div key={t.n} onClick={() => setFd(p => Object.assign({},p,{teknisi:t.n}))} className="tap" style={{padding:"12px 10px",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",background:fd.teknisi===t.n?"linear-gradient(135deg,#3B82F6,#6366F1)":T.chip,color:fd.teknisi===t.n?"#fff":T.text,display:"flex",alignItems:"center",gap:8,boxShadow:fd.teknisi===t.n?"0 4px 12px rgba(59,130,246,0.3)":"none"}}>
-                <span style={{fontSize:20}}>{t.e}</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13}}>{t.n}</div>
-                  <div style={{fontSize:10,opacity:0.85,marginTop:1}}>{t.sp}</div>
-                </div>
-                {fd.teknisi===t.n && <Ico n="check" s={16}/>}
-              </div>)}
-            </div>
-          </div>
-          <div style={{marginBottom:18}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>Estimasi Tanggal Selesai</label>
-            <input style={inp("")} type="date" value={fd.tglEstSelesai} onChange={e => setFd(p => Object.assign({},p,{tglEstSelesai:e.target.value}))}/>
-          </div>
-          <div style={{marginBottom:20}}>
-            <label style={{display:"block",fontSize:13,fontWeight:700,color:T.ts,marginBottom:8}}>📝 Catatan Internal</label>
-            <textarea style={Object.assign({},inp(""),{minHeight:70,resize:"vertical"})} placeholder="Catatan untuk teknisi..." value={fd.catatan} onChange={e => setFd(p => Object.assign({},p,{catatan:e.target.value}))}/>
-          </div>
-
-          {/* Summary */}
-          <div style={{padding:18,background:`linear-gradient(135deg,${T.bg2},${T.card})`,borderRadius:18,border:`1.5px dashed ${T.cb}`,marginBottom:8}}>
-            <div style={{fontSize:11,fontWeight:800,color:T.tm,letterSpacing:"1.5px",marginBottom:14,textAlign:"center"}}>📋 RINGKASAN ORDER</div>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,paddingBottom:14,borderBottom:`1px solid ${T.dv}`}}>
-              <Avatar name={fd.namaCustomer || "Baru"} size={44}/>
+// ---------- BRANCH MODAL ----------
+const BranchModal = ({ onClose, current, setBranch }) => (
+  <div className="modal" onClick={onClose}>
+    <div className="mbox" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+      <div className="mhd"><h3>Pilih Cabang</h3><button className="close" onClick={onClose}><Ic n="x" /></button></div>
+      <div className="mbd">
+        {BRANCHES.map((b) => (
+          <div key={b.id}
+            style={{ padding: 14, border: `1px solid ${b.id === current ? "var(--pri)" : "var(--line)"}`, borderRadius: 10, marginBottom: 8, cursor: "pointer",
+                     background: b.id === current ? "rgba(249,115,22,0.1)" : "var(--bg2)" }}
+            onClick={() => { setBranch(b.id); onClose(); }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{fontSize:15,fontWeight:800,color:T.text}}>{fd.namaCustomer || "-"}</div>
-                <div style={{fontSize:12,color:T.ts}}>{fd.noHP || "-"}</div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{b.name}</div>
+                <div style={{ fontSize: 12, color: "var(--txt2)", marginTop: 3 }}>{b.addr}</div>
+                <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 3 }}>📞 {b.phone}</div>
               </div>
+              <span className="chip" style={{ background: b.owner === "Pusat" ? "var(--pri)" : "var(--panel2)", color: b.owner === "Pusat" ? "#fff" : "var(--txt2)" }}>{b.owner}</span>
             </div>
-            {[
-              ["📱 Perangkat",`${fd.merkHP || ""} ${fd.tipeHP || ""} ${fd.warnaHP ? "(" + fd.warnaHP + ")" : ""}`],
-              ["🔧 Kerusakan",fd.kerusakan || "-"],
-              ["⚡ Prioritas",fd.prioritas + " " + (PRIORITAS.find(p => p.v === fd.prioritas)||{}).e],
-              ["👨‍🔧 Teknisi",fd.teknisi || "-"],
-              ["💰 Estimasi",rp(fd.biayaEstimasi||0)],
-              ["💵 DP",rp(fd.uangMuka||0)],
-              ["💸 Sisa",rp(Math.max(0,(Number(fd.biayaEstimasi)||0)-(Number(fd.uangMuka)||0)))],
-            ].map((r,i) => <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",fontSize:12}}>
-              <span style={{color:T.tm}}>{r[0]}</span>
-              <span style={{fontWeight:700,color:T.text,textAlign:"right",maxWidth:"60%"}}>{r[1]}</span>
-            </div>)}
           </div>
-        </div>}
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
-        <div style={{display:"flex",gap:12,marginTop:16}}>
-          {step > 0 && <button onClick={() => setStep(s => Math.max(0,s-1))} className="tap" style={{flex:1,padding:16,borderRadius:16,border:`1.5px solid ${T.cb}`,background:"transparent",color:T.ts,fontSize:15,fontWeight:700,cursor:"pointer"}}>← Kembali</button>}
-          {step < 3
-            ? <button onClick={() => {if (validate(step)) setStep(s => s+1);}} className="tap btn-primary" style={{flex:2,padding:16,borderRadius:16,border:"none",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>Lanjut →</button>
-            : <button onClick={submitForm} disabled={loading} className="tap btn-success" style={{flex:2,padding:16,borderRadius:16,border:"none",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",opacity:loading?0.7:1}}>{loading ? "⏳ Menyimpan..." : "✅ Simpan Order"}</button>
+// ---------- DASHBOARD ----------
+const DashboardPage = ({ tickets, sales, technicians, products, branch, user, setPage }) => {
+  const bt = tickets.filter((t) => t.branch === branch);
+  const bs = sales.filter((s) => s.branch === branch);
+  const today = new Date().toDateString();
+  const todayTickets = bt.filter((t) => new Date(t.createdAt).toDateString() === today);
+  const todaySales = bs.filter((s) => new Date(s.createdAt).toDateString() === today);
+  const omsetServis = todayTickets.filter((t) => ["selesai", "ambil"].includes(t.status)).reduce((s, t) => s + (t.totalCost || 0), 0);
+  const omsetKasir = todaySales.reduce((s, x) => s + x.total, 0);
+  const omsetTotal = omsetServis + omsetKasir;
+  const aktif = bt.filter((t) => !["selesai", "ambil", "batal"].includes(t.status));
+  const totalProduk = products.length;
+  const stokRendah = products.filter((p) => p.stock < 5).length;
+  const piutang = bt.filter((t) => t.sisa > 0 && !["batal"].includes(t.status)).reduce((s, t) => s + t.sisa, 0);
+  const statusDist = STATUS.map((s) => ({ ...s, count: bt.filter((t) => t.status === s.id).length }));
+  const recentSales = bs.slice(0, 5);
+  const recentService = bt.slice(0, 5);
+  const hour = new Date().getHours();
+  const greet = hour < 11 ? "Selamat pagi" : hour < 15 ? "Selamat siang" : hour < 18 ? "Selamat sore" : "Selamat malam";
+
+  return (
+    <div className="cnt">
+      <div className="card" style={{ marginBottom: 18, background: "linear-gradient(135deg,rgba(249,115,22,0.1),rgba(251,191,36,0.05))", borderColor: "var(--line2)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>{greet}, {user.name.split(" ")[0]}! 👋</h2>
+            <p style={{ fontSize: 12, color: "var(--txt3)", marginTop: 4 }}>Terakhir dimuat: {new Date().toLocaleTimeString("id-ID")} • {fD(Date.now())}</p>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn pri" onClick={() => setPage("pos")}><Ic n="pos" s={14} /> Buka Kasir</button>
+            <button className="btn ok" onClick={() => setPage("ticket")}><Ic n="plus" s={14} /> Terima Servis</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", marginBottom: 18 }}>
+        <div className="kpi">
+          <div className="lbl">Pendapatan Hari Ini</div>
+          <div className="v" style={{ color: "var(--pri)" }}>{rp(omsetTotal)}</div>
+          <div className="sub">Kasir: {rp(omsetKasir)} • Servis: {rp(omsetServis)}</div>
+        </div>
+        <div className="kpi alt3">
+          <div className="lbl">Servis Aktif</div>
+          <div className="v" style={{ color: "var(--acc)" }}>{aktif.length}</div>
+          <div className="sub">{bt.filter(t => t.status === "selesai").length} BELUM DIAMBIL</div>
+        </div>
+        <div className="kpi alt">
+          <div className="lbl">Total Produk</div>
+          <div className="v">{totalProduk}</div>
+          <div className="sub" style={{ color: stokRendah > 0 ? "var(--err)" : "var(--ok)" }}>{stokRendah > 0 ? `${stokRendah} stok rendah` : "Stok aman"}</div>
+        </div>
+        <div className="kpi alt4">
+          <div className="lbl">Piutang Belum Lunas</div>
+          <div className="v" style={{ color: piutang > 0 ? "var(--err)" : "var(--ok)" }}>{rp(piutang)}</div>
+          <div className="sub">{bt.filter(t => t.sisa > 0 && t.status !== "batal").length} piutang</div>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div className="card">
+          <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>🔧 Servis Terbaru</h3>
+          {recentService.length === 0 ? <div className="empty"><div className="empty-ic">📋</div>Belum ada</div>
+            : recentService.map((t) => (
+              <div key={t.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px dashed var(--line)" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{t.brand} {t.model}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 2 }}>{t.custName}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <StatusBadge st={t.status} />
+                  <div style={{ fontSize: 10, color: "var(--txt3)", marginTop: 4, fontFamily: "monospace" }}>{t.id}</div>
+                </div>
+              </div>
+            ))
+          }
+        </div>
+        <div className="card">
+          <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>🕒 Transaksi Terbaru</h3>
+          {recentSales.length === 0 ? <div className="empty"><div className="empty-ic">🛒</div>Belum ada</div>
+            : recentSales.map((s) => (
+              <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px dashed var(--line)" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{s.custName}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 2 }}>{fFull(s.createdAt)}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "var(--pri)" }}>{rp(s.total)}</div>
+                  <span className="bdg" style={{ background: "rgba(16,185,129,0.2)", color: "var(--ok)", marginTop: 4 }}>Lunas</span>
+                </div>
+              </div>
+            ))
           }
         </div>
       </div>
-      <Toast d={toast}/>
-    </div>;
-  }
 
-  /* ═══ STATS PAGE ═══ */
-  const renderStats = () => <div style={{padding:"14px 16px 110px",animation:"fadeUp .3s ease"}}>
-    <div style={{fontSize:22,fontWeight:800,color:T.text,marginBottom:4}}>📊 Laporan & Analitik</div>
-    <div style={{fontSize:13,color:T.ts,marginBottom:20}}>Insight bisnis service center kamu</div>
-
-    {/* Revenue Cards */}
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-      <div style={{padding:16,borderRadius:16,background:"linear-gradient(135deg,#10B981,#059669)",color:"#fff",boxShadow:"0 6px 20px rgba(16,185,129,0.3)"}}>
-        <div style={{fontSize:11,opacity:0.9,fontWeight:700,letterSpacing:"1px"}}>💰 PENDAPATAN BULAN INI</div>
-        <div style={{fontSize:18,fontWeight:900,marginTop:6,letterSpacing:"-0.3px"}}>{rp(stats.revMonth)}</div>
-        <div style={{fontSize:11,opacity:0.85,marginTop:4}}>Hari ini: {rp(stats.revToday)}</div>
-      </div>
-      <div style={{padding:16,borderRadius:16,background:"linear-gradient(135deg,#F59E0B,#D97706)",color:"#fff",boxShadow:"0 6px 20px rgba(245,158,11,0.3)"}}>
-        <div style={{fontSize:11,opacity:0.9,fontWeight:700,letterSpacing:"1px"}}>💸 PIUTANG</div>
-        <div style={{fontSize:18,fontWeight:900,marginTop:6,letterSpacing:"-0.3px"}}>{rp(stats.piutang)}</div>
-        <div style={{fontSize:11,opacity:0.85,marginTop:4}}>Belum dibayar lunas</div>
-      </div>
-    </div>
-
-    {/* Rating */}
-    <div style={{padding:18,borderRadius:16,background:T.card,border:`1px solid ${T.cb}`,marginBottom:14}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,color:T.tm,fontWeight:800,letterSpacing:"1px"}}>⭐ RATING CUSTOMER</div>
-          <div style={{fontSize:32,fontWeight:900,color:T.text,marginTop:4,letterSpacing:"-1px"}}>{stats.avgRating || "-"}</div>
-          <div style={{fontSize:12,color:T.ts,marginTop:2}}>{stats.ratedCount} review</div>
-        </div>
-        <div><Stars n={Math.round(stats.avgRating)}/></div>
-      </div>
-    </div>
-
-    {/* Week trend */}
-    <div style={{padding:18,borderRadius:16,background:T.card,border:`1px solid ${T.cb}`,marginBottom:14}}>
-      <div style={{fontSize:11,color:T.tm,fontWeight:800,letterSpacing:"1px",marginBottom:14}}>📈 TREN 7 HARI TERAKHIR</div>
-      <div style={{display:"flex",gap:6,alignItems:"flex-end",height:100}}>
-        {stats.weekTrend.map((w,i) => {
-          const max = Math.max(...stats.weekTrend.map(x => x.count), 1);
-          const h = (w.count / max) * 80 + 4;
-          const today_ = w.date === today();
-          return <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-            <div style={{fontSize:11,fontWeight:800,color:today_?"#3B82F6":T.text}}>{w.count}</div>
-            <div style={{width:"100%",height:h,borderRadius:6,background:today_?"linear-gradient(180deg,#3B82F6,#6366F1)":"linear-gradient(180deg,"+T.tm+","+T.ts+")",transition:"all .4s ease",animation:`fadeUp .5s ease ${i*0.05}s both`}}/>
-            <div style={{fontSize:10,color:T.tm,fontWeight:600}}>{w.label}</div>
-          </div>;
-        })}
-      </div>
-    </div>
-
-    {/* Top brands */}
-    <div style={{padding:18,borderRadius:16,background:T.card,border:`1px solid ${T.cb}`,marginBottom:14}}>
-      <div style={{fontSize:11,color:T.tm,fontWeight:800,letterSpacing:"1px",marginBottom:14}}>📱 TOP MERK HP</div>
-      {stats.topBrands.length ? stats.topBrands.map(([n,c],i) => {
-        const b = BRANDS.find(x => x.n === n) || {e:"📞"};
-        const max = stats.topBrands[0][1];
-        const pct = (c / max) * 100;
-        return <div key={n} style={{marginBottom:10}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-            <span style={{fontSize:13,fontWeight:700,color:T.text}}>{b.e} {n}</span>
-            <span style={{fontSize:13,fontWeight:800,color:T.tm}}>{c}</span>
-          </div>
-          <div style={{height:6,borderRadius:3,background:T.bg2,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,#3B82F6,#8B5CF6)`,borderRadius:3,transition:"width .6s",animation:`slideRight .6s ease ${i*0.1}s both`}}/>
-          </div>
-        </div>;
-      }) : <Empty icon="📱" title="Belum ada data" msg="Tambahkan service order untuk melihat statistik"/>}
-    </div>
-
-    {/* Top damages */}
-    <div style={{padding:18,borderRadius:16,background:T.card,border:`1px solid ${T.cb}`,marginBottom:14}}>
-      <div style={{fontSize:11,color:T.tm,fontWeight:800,letterSpacing:"1px",marginBottom:14}}>🔧 KERUSAKAN PALING SERING</div>
-      {stats.topDamages.length ? stats.topDamages.map(([n,c],i) => {
-        const d = DAMAGES.find(x => x.n === n) || {e:"🔧"};
-        return <div key={n} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:i<stats.topDamages.length-1?`1px solid ${T.dv}`:"none"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:36,height:36,borderRadius:10,background:`#EF444420`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{d.e}</div>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:T.text}}>{n}</div>
-              {i === 0 && <div style={{fontSize:10,color:"#EF4444",fontWeight:700,marginTop:1}}>🔥 Paling banyak</div>}
+      <div className="card">
+        <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>📊 Distribusi Status Servis</h3>
+        {statusDist.map((s) => (
+          <div key={s.id} style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{s.label}</span>
+              <span style={{ fontSize: 12, color: "var(--txt2)" }}>{s.count} tiket</span>
+            </div>
+            <div style={{ height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${bt.length ? (s.count / bt.length) * 100 : 0}%`, background: s.color, transition: "width 0.5s" }} />
             </div>
           </div>
-          <div style={{padding:"4px 12px",borderRadius:10,background:T.bg2,fontSize:13,fontWeight:800,color:T.text}}>{c}x</div>
-        </div>;
-      }) : <Empty icon="🔧" title="-" msg="Belum ada data kerusakan"/>}
-    </div>
-
-    {/* Top teknisi */}
-    <div style={{padding:18,borderRadius:16,background:T.card,border:`1px solid ${T.cb}`,marginBottom:14}}>
-      <div style={{fontSize:11,color:T.tm,fontWeight:800,letterSpacing:"1px",marginBottom:14}}>👨‍🔧 PERFORMA TEKNISI</div>
-      {stats.topTeknisi.length ? stats.topTeknisi.map(([n,c],i) => {
-        const t = TEKNISI.find(x => x.n === n) || {e:"🧑‍🔧",sp:"-"};
-        return <div key={n} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:i<stats.topTeknisi.length-1?`1px solid ${T.dv}`:"none"}}>
-          <div style={{width:38,height:38,borderRadius:12,background:i===0?"linear-gradient(135deg,#FBBF24,#F59E0B)":T.bg2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{i===0?"🏆":t.e}</div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:800,color:T.text}}>{n}</div>
-            <div style={{fontSize:11,color:T.tm}}>{t.sp}</div>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <div style={{fontSize:14,fontWeight:900,color:T.text}}>{c}</div>
-            <div style={{fontSize:10,color:T.tm}}>order</div>
-          </div>
-        </div>;
-      }) : <Empty icon="👨‍🔧" title="-" msg="Belum ada data teknisi"/>}
-    </div>
-  </div>;
-
-  /* ═══ KANBAN BOARD ═══ */
-  const renderBoard = () => <div style={{padding:"14px 16px 110px",animation:"fadeUp .3s ease"}}>
-    <div style={{fontSize:22,fontWeight:800,color:T.text,marginBottom:4}}>📋 Board Service</div>
-    <div style={{fontSize:13,color:T.ts,marginBottom:20}}>Pantau semua service per status</div>
-    {SFLOW.concat(["Batal"]).map(status => {
-      const items = data.filter(d => d.status === status);
-      const sm = SMAP[status];
-      return <div key={status} style={{marginBottom:16,background:T.card,borderRadius:18,border:`1px solid ${T.cb}`,overflow:"hidden"}}>
-        <div style={{padding:"14px 18px",background:`linear-gradient(90deg,${sm.bg},transparent)`,borderLeft:`4px solid ${sm.c}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:18}}>{sm.e}</span>
-            <div>
-              <div style={{fontSize:14,fontWeight:800,color:T.text}}>{status}</div>
-              <div style={{fontSize:11,color:T.ts}}>{sm.txt}</div>
-            </div>
-          </div>
-          <div style={{padding:"4px 12px",borderRadius:20,background:sm.c,color:"#fff",fontSize:12,fontWeight:800}}>{items.length}</div>
-        </div>
-        {items.length === 0 ? <div style={{padding:"24px",textAlign:"center",fontSize:12,color:T.tm}}>Tidak ada item</div>
-          : items.slice(0,3).map(item => <div key={item.id} onClick={() => {setSel(item); setPage("detail");}} className="tap" style={{padding:"12px 18px",borderTop:`1px solid ${T.dv}`,display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
-            <Avatar name={item.namaCustomer} size={36}/>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:700,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.namaCustomer}</div>
-              <div style={{fontSize:11,color:T.ts,marginTop:1}}>{item.merkHP} • {item.kerusakan}</div>
-            </div>
-            <Ico n="chev" s={14}/>
-          </div>)}
-        {items.length > 3 && <div onClick={() => {setFilter(status); setTab("list"); setPage("main");}} className="tap" style={{padding:"10px",textAlign:"center",fontSize:12,fontWeight:700,color:"#3B82F6",cursor:"pointer",borderTop:`1px solid ${T.dv}`}}>Lihat semua {items.length} →</div>}
-      </div>;
-    })}
-  </div>;
-
-  /* ═══ MORE PAGE ═══ */
-  const renderMore = () => <div style={{padding:"14px 16px 110px",animation:"fadeUp .3s ease"}}>
-    <div style={{fontSize:22,fontWeight:800,color:T.text,marginBottom:20}}>⚙️ Lainnya</div>
-
-    {/* Customer DB */}
-    <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:14,border:`1px solid ${T.cb}`}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <div>
-          <div style={{fontSize:15,fontWeight:800,color:T.text}}>👥 Database Customer</div>
-          <div style={{fontSize:12,color:T.ts,marginTop:2}}>{customers.length} customer terdaftar</div>
-        </div>
-      </div>
-      {customers.slice(0,5).map(c => <div key={c.noHP} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${T.dv}`}}>
-        <Avatar name={c.nama} size={40}/>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:800,color:T.text}}>{c.nama}</div>
-          <div style={{fontSize:11,color:T.ts}}>{c.noHP} • {c.visits}x kunjungan</div>
-        </div>
-        <div style={{fontSize:12,fontWeight:800,color:"#10B981"}}>{rp(c.total)}</div>
-      </div>)}
-      {customers.length > 5 && <div style={{textAlign:"center",fontSize:12,color:"#3B82F6",fontWeight:700,paddingTop:10}}>+{customers.length-5} customer lainnya</div>}
-    </div>
-
-    {/* Settings */}
-    <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:14,border:`1px solid ${T.cb}`}}>
-      <div style={{fontSize:15,fontWeight:800,color:T.text,marginBottom:14}}>⚙️ Pengaturan</div>
-      <div style={{marginBottom:12}}>
-        <label style={{display:"block",fontSize:12,fontWeight:700,color:T.ts,marginBottom:6}}>Nama Toko</label>
-        <input style={inp("")} value={shopName} onChange={e => setShopName(e.target.value)}/>
-      </div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderTop:`1px solid ${T.dv}`}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}><Ico n={dark?"sun":"moon"}/><span style={{fontSize:13,fontWeight:700,color:T.text}}>Mode {dark?"Terang":"Gelap"}</span></div>
-        <div onClick={() => setDark(!dark)} className="tap" style={{width:48,height:28,borderRadius:14,background:dark?"#3B82F6":"#CBD5E1",position:"relative",cursor:"pointer",transition:"all .3s"}}>
-          <div style={{width:22,height:22,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:dark?23:3,transition:"all .3s",boxShadow:"0 2px 4px rgba(0,0,0,0.2)"}}/>
-        </div>
+        ))}
       </div>
     </div>
+  );
+};
 
-    {/* About */}
-    <div style={{background:T.card,borderRadius:18,padding:18,marginBottom:14,border:`1px solid ${T.cb}`,textAlign:"center"}}>
-      <div style={{fontSize:36,marginBottom:8}}>🔧</div>
-      <div style={{fontSize:16,fontWeight:800,color:T.text}}>{shopName}</div>
-      <div style={{fontSize:11,color:T.tm,marginTop:4}}>v3.0 Premium Edition</div>
-      <div style={{fontSize:11,color:T.tm,marginTop:8,lineHeight:1.6}}>Aplikasi manajemen service center HP profesional untuk Android & iOS</div>
-    </div>
-  </div>;
+// ---------- POS / KASIR ----------
+const POSPage = ({ products, setProducts, sales, setSales, customers, branch, user, shop }) => {
+  const [cat, setCat] = useState("all");
+  const [q, setQ] = useState("");
+  const [cart, setCart] = useState([]);
+  const [custName, setCustName] = useState("Umum");
+  const [payOpen, setPayOpen] = useState(false);
+  const [printSale, setPrintSale] = useState(null);
 
-  /* ═══ HOME PAGE ═══ */
-  const g = greeting();
-  const renderHome = () => <div style={{animation:"fadeUp .3s ease"}}>
-    {/* Greeting Hero */}
-    <div style={{background:T.hbg,color:"#fff",padding:"16px 18px 22px",position:"relative",overflow:"hidden"}}>
-      <div style={{position:"absolute",top:-100,right:-100,width:240,height:240,borderRadius:"50%",background:"radial-gradient(circle,rgba(56,189,248,0.15),transparent 70%)"}}/>
-      <div style={{position:"absolute",bottom:-60,left:-60,width:160,height:160,borderRadius:"50%",background:"radial-gradient(circle,rgba(168,85,247,0.12),transparent 70%)"}}/>
+  const filtered = products.filter((p) => {
+    if (cat !== "all" && p.cat !== cat) return false;
+    if (q && !p.name.toLowerCase().includes(q.toLowerCase()) && !p.barcode?.includes(q)) return false;
+    return true;
+  });
 
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,position:"relative",zIndex:1}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:52,height:44,borderRadius:12,overflow:"hidden",boxShadow:"0 4px 15px rgba(56,189,248,0.35)",flexShrink:0,border:"1px solid rgba(56,189,248,0.3)"}}><img src={logo} alt="MAX" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></div>
-          <div>
-            <div style={{fontSize:11,color:"#94A3B8",fontWeight:700,letterSpacing:"1.5px",textTransform:"uppercase"}}>{g.e} {g.t}</div>
-            <div style={{fontSize:18,fontWeight:800}}>MAX MOBILE</div>
+  const addToCart = (p) => {
+    if (p.stock <= 0) return alert("Stok habis!");
+    const ex = cart.find((x) => x.id === p.id);
+    if (ex) {
+      if (ex.qty >= p.stock) return alert("Stok tidak cukup");
+      setCart(cart.map((x) => x.id === p.id ? { ...x, qty: x.qty + 1 } : x));
+    } else {
+      setCart([...cart, { id: p.id, name: p.name, price: p.price, qty: 1 }]);
+    }
+  };
+  const updQty = (id, delta) => {
+    const p = products.find((x) => x.id === id);
+    setCart(cart.map((x) => {
+      if (x.id !== id) return x;
+      const nq = x.qty + delta;
+      if (nq <= 0) return null;
+      if (nq > p.stock) { alert("Stok tidak cukup"); return x; }
+      return { ...x, qty: nq };
+    }).filter(Boolean));
+  };
+  const removeItem = (id) => setCart(cart.filter((x) => x.id !== id));
+  const total = cart.reduce((s, x) => s + x.price * x.qty, 0);
+
+  const processPayment = (method, payAmt) => {
+    const sale = {
+      id: gid("TR"), branch, customerId: "", custName, items: cart, total,
+      payMethod: method, payAmt, change: payAmt - total,
+      createdAt: Date.now(), cashier: user.id,
+    };
+    setSales([sale, ...sales]);
+    setProducts(products.map((p) => {
+      const c = cart.find((x) => x.id === p.id);
+      return c ? { ...p, stock: p.stock - c.qty } : p;
+    }));
+    setCart([]); setCustName("Umum"); setPayOpen(false);
+    setPrintSale(sale);
+  };
+
+  return (
+    <div className="cnt" style={{ maxWidth: "100%", padding: 14 }}>
+      <div className="pos-wrap">
+        <div className="pos-left">
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input className="inp" placeholder="🔍 Cari produk atau scan barcode..." value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <div className="pos-cats">
+            <button className={`pos-cat ${cat === "all" ? "on" : ""}`} onClick={() => setCat("all")}>Semua ({products.length})</button>
+            {PRODUCT_CATS.map((c) => {
+              const cnt = products.filter((p) => p.cat === c.id).length;
+              return <button key={c.id} className={`pos-cat ${cat === c.id ? "on" : ""}`} onClick={() => setCat(c.id)}>{c.icon} {c.name} ({cnt})</button>;
+            })}
+          </div>
+          <div className="pos-grid">
+            {filtered.length === 0 ? <div className="empty" style={{ gridColumn: "1/-1" }}><div className="empty-ic">📦</div>Tidak ada produk</div>
+              : filtered.map((p) => (
+                <div key={p.id} className="pos-prod" onClick={() => addToCart(p)}>
+                  <div className="pos-prod-img">{p.img}</div>
+                  <div className="pos-prod-nm">{p.name}</div>
+                  <div className="pos-prod-pr">{rp(p.price)}</div>
+                  <div className="pos-prod-st" style={{ color: p.stock < 5 ? "var(--err)" : "var(--txt3)" }}>Stok: {p.stock}</div>
+                </div>
+              ))
+            }
           </div>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <div onClick={() => setDark(!dark)} className="tap" style={{cursor:"pointer",padding:9,borderRadius:11,background:"rgba(255,255,255,0.1)"}}><Ico n={dark?"sun":"moon"} s={18}/></div>
-          <div onClick={() => fetchData(true)} className="tap" style={{cursor:"pointer",padding:9,borderRadius:11,background:"rgba(255,255,255,0.1)",animation:spinning?"spin 1s linear infinite":"none"}}><Ico n="refresh" s={18}/></div>
-        </div>
-      </div>
 
-      {/* Big Revenue Card */}
-      <div style={{background:"linear-gradient(135deg,rgba(16,185,129,0.18),rgba(5,150,105,0.12))",borderRadius:18,padding:18,marginBottom:14,position:"relative",zIndex:1,border:"1px solid rgba(52,211,153,0.2)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-          <div>
-            <div style={{fontSize:11,color:"#94A3B8",fontWeight:700,letterSpacing:"1px"}}>💰 PENDAPATAN BULAN INI</div>
-            <div style={{fontSize:24,fontWeight:900,color:"#fff",marginTop:6,letterSpacing:"-0.5px"}}>{rp(stats.revMonth)}</div>
-            <div style={{fontSize:11,color:"#34D399",marginTop:4,fontWeight:700}}>↗ Hari ini: {rp(stats.revToday)}</div>
+        <div className="pos-right">
+          <div className="cart-hd">
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>🛒 Keranjang ({cart.length})</div>
+            <input className="inp" placeholder="Nama pelanggan" value={custName} onChange={(e) => setCustName(e.target.value)} style={{ fontSize: 12, padding: "8px 10px" }} />
           </div>
-          <div style={{padding:"6px 12px",borderRadius:20,background:"rgba(52,211,153,0.2)",color:"#34D399",fontSize:11,fontWeight:800}}>+{stats.hari} hari ini</div>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,position:"relative",zIndex:1}}>
-        {[
-          [stats.total,"Total","#F1F5F9","📦"],
-          [stats.proses,"Proses","#FBBF24","🔧"],
-          [stats.selesai,"Selesai","#34D399","✅"],
-          [stats.hari,"Hari Ini","#38BDF8","📅"],
-        ].map(([n,l,c,e],i) => <div key={i} style={{background:"rgba(255,255,255,0.07)",borderRadius:14,padding:"12px 6px",textAlign:"center",border:"1px solid rgba(255,255,255,0.05)",backdropFilter:"blur(10px)"}}>
-          <div style={{fontSize:18,marginBottom:2}}>{e}</div>
-          <div style={{fontSize:20,fontWeight:900,color:c}}>{n}</div>
-          <div style={{fontSize:9,color:"#94A3B8",marginTop:1,textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:700}}>{l}</div>
-        </div>)}
-      </div>
-    </div>
-
-    {/* Quick Action Banner */}
-    {stats.proses > 0 && <div onClick={() => {setFilter("Proses"); setTab("list");}} className="tap" style={{margin:"14px 16px",padding:14,background:"linear-gradient(135deg,#FFFBEB,#FEF3C7)",borderRadius:14,border:"1.5px solid #FBBF24",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
-      <div style={{fontSize:28}}>⚡</div>
-      <div style={{flex:1}}>
-        <div style={{fontSize:13,fontWeight:800,color:"#92400E"}}>{stats.proses} service sedang proses</div>
-        <div style={{fontSize:11,color:"#78350F"}}>Tap untuk lihat semua</div>
-      </div>
-      <Ico n="chev" s={18}/>
-    </div>}
-
-    {/* Recent Orders */}
-    <div style={{padding:"4px 16px 110px"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12,marginBottom:12}}>
-        <div style={{fontSize:15,fontWeight:800,color:T.text}}>🕐 Order Terbaru</div>
-        <div onClick={() => setTab("list")} className="tap" style={{fontSize:12,fontWeight:700,color:"#3B82F6",cursor:"pointer"}}>Semua →</div>
-      </div>
-      {loading && !data.length ? <><Skeleton/><Skeleton/><Skeleton/></>
-        : data.slice(0,5).map((item,idx) => {
-          const st = SMAP[item.status] || SMAP.Diterima;
-          return <div key={item.id} onClick={() => {setSel(item); setPage("detail");}} className="tap" style={{background:T.card,borderRadius:16,padding:14,marginBottom:10,border:`1px solid ${T.cb}`,cursor:"pointer",animation:`fadeUp .3s ease ${idx*0.04}s both`,display:"flex",alignItems:"center",gap:12}}>
-            <Avatar name={item.namaCustomer} size={42}/>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2,gap:8}}>
-                <div style={{fontSize:14,fontWeight:800,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.namaCustomer}</div>
-                <Badge s={item.status}/>
+          <div className="cart-bd">
+            {cart.length === 0 ? (
+              <div className="empty" style={{ padding: 30 }}>
+                <div className="empty-ic">🛒</div>
+                <div style={{ fontSize: 12 }}>Pilih produk untuk mulai</div>
               </div>
-              <div style={{fontSize:11,color:T.tm,fontWeight:600}}>{item.merkHP} {item.tipeHP} • {item.kerusakan}</div>
-            </div>
-          </div>;
-        })}
-    </div>
-  </div>;
-
-  /* ═══ LIST PAGE ═══ */
-  const renderList = () => <div style={{padding:"14px 16px 110px",animation:"fadeUp .3s ease"}}>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-      <div>
-        <div style={{fontSize:22,fontWeight:800,color:T.text}}>📋 Daftar Service</div>
-        <div style={{fontSize:12,color:T.ts,marginTop:2}}>{filtered.length} dari {data.length} order</div>
-      </div>
-      <div onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")} className="tap" style={{padding:10,borderRadius:12,background:T.card,border:`1px solid ${T.cb}`,cursor:"pointer",color:T.ts}}><Ico n={viewMode==="list"?"grid":"list"} s={18}/></div>
-    </div>
-
-    {/* Search */}
-    <div style={{display:"flex",alignItems:"center",gap:10,background:T.card,borderRadius:16,padding:"12px 16px",marginBottom:12,border:`1px solid ${T.cb}`}}>
-      <span style={{color:T.tm}}><Ico n="search" s={18}/></span>
-      <input style={{border:"none",outline:"none",flex:1,fontSize:15,color:T.text,background:"transparent",fontFamily:"inherit"}} placeholder="Cari nama, ID, merk, kerusakan..." value={search} onChange={e => setSearch(e.target.value)}/>
-      {search && <span onClick={() => setSearch("")} className="tap" style={{cursor:"pointer",color:T.tm,fontSize:18,fontWeight:800,padding:"0 4px"}}><Ico n="x" s={16}/></span>}
-    </div>
-
-    {/* Sort */}
-    <div style={{display:"flex",gap:6,marginBottom:10,overflowX:"auto",paddingBottom:6}}>
-      {[["newest","🆕 Terbaru"],["oldest","📅 Terlama"],["priority","⚡ Prioritas"],["biaya","💰 Biaya"]].map(s => <div key={s[0]} onClick={() => setSortBy(s[0])} className="tap" style={{padding:"7px 13px",borderRadius:10,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",background:sortBy===s[0]?T.text:T.chip,color:sortBy===s[0]?T.bg:T.ts,flexShrink:0}}>{s[1]}</div>)}
-    </div>
-
-    {/* Status Filter */}
-    <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:12,marginBottom:8}}>
-      {["Semua"].concat(Object.keys(SMAP)).map(s => {
-        const cnt = s === "Semua" ? data.length : data.filter(d => d.status === s).length;
-        const act = filter === s;
-        const sm = SMAP[s] || {};
-        return <div key={s} onClick={() => setFilter(s)} className="tap" style={{padding:"8px 14px",borderRadius:12,fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,flexShrink:0,background:act?(s==="Semua"?"linear-gradient(135deg,#3B82F6,#6366F1)":sm.bg):T.chip,color:act?(s==="Semua"?"#fff":sm.c):T.tm,boxShadow:act?"0 2px 8px rgba(0,0,0,0.08)":"none",border:act&&s!=="Semua"?`1.5px solid ${sm.c}33`:"1.5px solid transparent"}}>
-          {s !== "Semua" && <span style={{fontSize:11}}>{sm.e}</span>}
-          {s} {cnt > 0 && <span style={{fontSize:10,opacity:0.7}}>{cnt}</span>}
-        </div>;
-      })}
-    </div>
-
-    {/* List */}
-    {loading && !data.length ? <><Skeleton/><Skeleton/><Skeleton/></>
-      : filtered.length === 0 ? <Empty icon={search?"🔍":"📱"} title={search?"Tidak ditemukan":"Belum ada data"} msg={search?`Tidak ada hasil untuk "${search}"`:"Tap + untuk menambah service order"} action={search?"Reset Pencarian":null} onAction={() => setSearch("")}/>
-      : viewMode === "grid"
-        ? <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          {filtered.map((item,idx) => {
-            const st = SMAP[item.status] || SMAP.Diterima;
-            return <div key={item.id} onClick={() => {setSel(item); setPage("detail");}} className="tap" style={{background:T.card,borderRadius:16,padding:14,border:`1px solid ${T.cb}`,cursor:"pointer",animation:`fadeUp .3s ease ${idx*0.03}s both`}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                <Avatar name={item.namaCustomer} size={40}/>
-                <Ico n={item.merkHP === "iPhone" ? "apple" : "android"} s={18}/>
+            ) : cart.map((it) => (
+              <div key={it.id} className="cart-itm">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.3 }}>{it.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--pri)", marginTop: 2 }}>{rp(it.price)}</div>
+                </div>
+                <div className="qty-grp">
+                  <button className="qty-btn" onClick={() => updQty(it.id, -1)}>−</button>
+                  <span className="qty-num">{it.qty}</span>
+                  <button className="qty-btn" onClick={() => updQty(it.id, 1)}>+</button>
+                </div>
+                <button className="close" onClick={() => removeItem(it.id)}><Ic n="x" s={14} /></button>
               </div>
-              <div style={{fontSize:13,fontWeight:800,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.namaCustomer}</div>
-              <div style={{fontSize:11,color:T.tm,marginTop:2,marginBottom:8}}>{item.merkHP} {item.tipeHP}</div>
-              <Badge s={item.status}/>
-              {Number(item.biayaEstimasi) > 0 && <div style={{marginTop:8,fontSize:13,fontWeight:800,color:"#3B82F6"}}>{rp(item.biayaEstimasi)}</div>}
-            </div>;
+            ))}
+          </div>
+          <div className="cart-ft">
+            <div className="cart-row"><span>Subtotal ({cart.reduce((s, x) => s + x.qty, 0)} item)</span><span>{rp(total)}</span></div>
+            <div className="cart-row tot"><span>TOTAL</span><span className="v">{rp(total)}</span></div>
+            <button className="btn pri" disabled={cart.length === 0} style={{ width: "100%", justifyContent: "center", padding: 12, fontSize: 14, marginTop: 10 }} onClick={() => setPayOpen(true)}>
+              <Ic n="cash" s={16} c="#fff" /> BAYAR
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {payOpen && <PayModal total={total} onClose={() => setPayOpen(false)} onConfirm={processPayment} />}
+      {printSale && <ReceiptModal sale={printSale} shop={shop} branch={branch} onClose={() => setPrintSale(null)} />}
+    </div>
+  );
+};
+
+// ---------- PAY MODAL ----------
+const PayModal = ({ total, onClose, onConfirm }) => {
+  const [method, setMethod] = useState("cash");
+  const [payAmt, setPayAmt] = useState(total);
+  const change = payAmt - total;
+  const quickCash = [total, Math.ceil(total / 10000) * 10000, Math.ceil(total / 50000) * 50000, Math.ceil(total / 100000) * 100000];
+  const unique = [...new Set(quickCash)];
+
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="mbox" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+        <div className="mhd"><h3>💰 Pembayaran</h3><button className="close" onClick={onClose}><Ic n="x" /></button></div>
+        <div className="mbd">
+          <div style={{ textAlign: "center", padding: 20, background: "var(--bg2)", borderRadius: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700 }}>Total Bayar</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: "var(--pri)", marginTop: 4 }}>{rp(total)}</div>
+          </div>
+          <div className="fld">
+            <label>Metode Pembayaran</label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
+              {PAY_METHODS.map((m) => (
+                <button key={m.id} className={`btn ${method === m.id ? "pri" : "gh"}`} onClick={() => setMethod(m.id)} style={{ flexDirection: "column", padding: 10, fontSize: 11 }}>
+                  <span style={{ fontSize: 18 }}>{m.icon}</span>{m.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          {method === "cash" && (
+            <>
+              <div className="fld">
+                <label>Tunai Diterima</label>
+                <input type="number" className="inp" value={payAmt} onChange={(e) => setPayAmt(Number(e.target.value))} style={{ fontSize: 18, fontWeight: 700 }} />
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                {unique.map((v) => <button key={v} className="btn gh sm" onClick={() => setPayAmt(v)}>{rp(v)}</button>)}
+              </div>
+              {change >= 0 && (
+                <div style={{ padding: 12, background: "rgba(16,185,129,0.1)", borderRadius: 10, border: "1px solid rgba(16,185,129,0.3)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontWeight: 700 }}>Kembalian</span>
+                    <span style={{ fontWeight: 800, color: "var(--ok)", fontSize: 18 }}>{rp(change)}</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        <div className="mft">
+          <button className="btn gh" onClick={onClose}>Batal</button>
+          <button className="btn pri" disabled={method === "cash" && payAmt < total} onClick={() => onConfirm(method, method === "cash" ? payAmt : total)}>
+            <Ic n="check" /> Konfirmasi Bayar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- RECEIPT MODAL ----------
+const ReceiptModal = ({ sale, shop, branch, onClose }) => {
+  const b = BRANCHES.find((x) => x.id === branch);
+  const handlePrint = () => window.print();
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="mbox" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
+        <div className="mhd"><h3>✅ Transaksi Berhasil</h3><button className="close" onClick={onClose}><Ic n="x" /></button></div>
+        <div className="mbd">
+          <div className="receipt">
+            <div className="hd">
+              <h3>{shop.name}</h3>
+              <div>{b?.name}</div>
+              <div>{b?.addr}</div>
+              <div>WA: {shop.waCS}</div>
+            </div>
+            <div className="ln"><span>No:</span><span>{sale.id}</span></div>
+            <div className="ln"><span>Tgl:</span><span>{fFull(sale.createdAt)}</span></div>
+            <div className="ln"><span>Pelanggan:</span><span>{sale.custName}</span></div>
+            <div className="div" />
+            {sale.items.map((it) => (
+              <div key={it.id}>
+                <div>{it.name}</div>
+                <div className="ln"><span>{it.qty} x {rp(it.price)}</span><span>{rp(it.qty * it.price)}</span></div>
+              </div>
+            ))}
+            <div className="div" />
+            <div className="ln" style={{ fontWeight: 800, fontSize: 13 }}><span>TOTAL</span><span>{rp(sale.total)}</span></div>
+            <div className="ln"><span>Bayar ({sale.payMethod.toUpperCase()})</span><span>{rp(sale.payAmt)}</span></div>
+            {sale.change > 0 && <div className="ln"><span>Kembali</span><span>{rp(sale.change)}</span></div>}
+            <div className="div" />
+            <div className="ft">{shop.receiptFooter}</div>
+          </div>
+        </div>
+        <div className="mft">
+          <button className="btn wa" onClick={() => window.open(waLink(shop.waCS, `Bukti transaksi ${sale.id} - Total ${rp(sale.total)}`))}><Ic n="wa" /> WhatsApp</button>
+          <button className="btn pri" onClick={handlePrint}><Ic n="print" /> Cetak</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- TIKET LIST ----------
+const TicketPage = ({ tickets, setTickets, technicians, branch, setSelected, setPage, kilatOnly = false }) => {
+  const [q, setQ] = useState("");
+  const [fst, setFst] = useState("all");
+  const bt = tickets.filter((t) => t.branch === branch && (kilatOnly ? t.kilat : true));
+  const filtered = bt.filter((t) => {
+    if (fst !== "all" && t.status !== fst) return false;
+    if (q) {
+      const s = q.toLowerCase();
+      return t.id.toLowerCase().includes(s) || t.custName.toLowerCase().includes(s)
+          || t.brand?.toLowerCase().includes(s) || t.model?.toLowerCase().includes(s);
+    }
+    return true;
+  });
+
+  return (
+    <div className="cnt">
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <input className="inp" placeholder="🔍 Cari ID, nama, brand, model…" value={q} onChange={(e) => setQ(e.target.value)} style={{ flex: 1, minWidth: 220 }} />
+        <select className="sel" style={{ width: 180 }} value={fst} onChange={(e) => setFst(e.target.value)}>
+          <option value="all">Semua Status</option>
+          {STATUS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="empty">
+          <div className="empty-ic">📋</div>
+          <p>Belum ada tiket. Klik <b>+ Terima Servis</b> untuk menambahkan.</p>
+        </div>
+      ) : (
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))" }}>
+          {filtered.map((t) => {
+            const dev = DEVICE_TYPES.find((d) => d.id === t.device);
+            const tech = technicians.find((x) => x.id === t.technicianId);
+            return (
+              <div key={t.id} className={`tck ${t.kilat ? "kilat" : ""}`} onClick={() => setSelected(t)}>
+                <div className="tck-hd">
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      <span className="tck-id">{t.id}</span>
+                      {t.kilat && <span className="bdg" style={{ background: "rgba(251,191,36,0.2)", color: "var(--acc)" }}>⚡ KILAT</span>}
+                    </div>
+                    <div className="tck-dev">{dev?.icon} {t.brand} {t.model}</div>
+                    <div className="tck-cust">👤 {t.custName}</div>
+                  </div>
+                  <StatusBadge st={t.status} />
+                </div>
+                <div className="tck-cmp">💬 {t.complaint}</div>
+                <div className="tck-ft">
+                  <span>{tech ? `🔧 ${tech.name.split(" ")[0]}` : "Belum assign"}</span>
+                  <span style={{ color: "var(--pri)", fontWeight: 700 }}>{rp(t.totalCost)}</span>
+                </div>
+              </div>
+            );
           })}
         </div>
-        : filtered.map((item,idx) => {
-          const st = SMAP[item.status] || SMAP.Diterima;
-          return <div key={item.id} onClick={() => {setSel(item); setPage("detail");}} className="tap" style={{background:T.card,borderRadius:18,padding:14,marginBottom:10,border:`1px solid ${T.cb}`,cursor:"pointer",animation:`fadeUp .3s ease ${idx*0.03}s both`}}>
-            <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
-              <Avatar name={item.namaCustomer} size={48}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-                  <div style={{minWidth:0}}>
-                    <div style={{fontSize:15,fontWeight:800,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.namaCustomer}</div>
-                    <div style={{fontSize:11,color:T.tm,fontWeight:600,marginTop:1}}>{item.id} • {item.merkHP} {item.tipeHP||""}</div>
+      )}
+    </div>
+  );
+};
+
+// ---------- NEW TICKET (4-step wizard) ----------
+const NewTicketModal = ({ onClose, setTickets, customers, setCustomers, technicians, branch, kilat = false }) => {
+  const [form, setForm] = useState({
+    device: "hp-android", brand: "", model: "", imei: "", color: "",
+    custName: "", custPhone: "", custEmail: "", custAddr: "",
+    complaint: "", accessories: "", password: "",
+    services: [], parts: [], technicianId: "",
+    estDone: "", dp: 0, notes: "", kilat,
+  });
+  const [step, setStep] = useState(1);
+  const upd = (k, v) => setForm({ ...form, [k]: v });
+
+  const toggleService = (svc) => {
+    const exists = form.services.find((s) => s.id === svc.id);
+    if (exists) upd("services", form.services.filter((s) => s.id !== svc.id));
+    else upd("services", [...form.services, { id: svc.id, name: svc.name, price: svc.price }]);
+  };
+
+  const total = form.services.reduce((s, x) => s + x.price, 0) + form.parts.reduce((s, x) => s + x.price, 0);
+
+  const submit = () => {
+    if (!form.custName || !form.custPhone || !form.complaint) {
+      alert("Isi minimal: Nama pelanggan, No HP, dan Keluhan");
+      return;
+    }
+    let custId = "";
+    const existing = customers.find((c) => c.phone === form.custPhone);
+    if (existing) custId = existing.id;
+    else {
+      const nc = { id: gid("CUST"), name: form.custName, phone: form.custPhone, email: form.custEmail, address: form.custAddr };
+      setCustomers([...customers, nc]);
+      custId = nc.id;
+    }
+    const newTicket = {
+      id: genResi(),
+      branch, customerId: custId, custName: form.custName, custPhone: form.custPhone,
+      device: form.device, brand: form.brand, model: form.model, imei: form.imei, color: form.color,
+      complaint: form.complaint, accessories: form.accessories, password: form.password,
+      diagnosis: "", services: form.services, parts: form.parts, technicianId: form.technicianId,
+      status: form.technicianId ? "diagnosa" : "antri", kilat: form.kilat,
+      estDone: form.estDone || "", warranty: 30,
+      totalCost: total, dp: Number(form.dp) || 0, sisa: total - (Number(form.dp) || 0),
+      payMethod: "", createdAt: Date.now(), notes: form.notes,
+    };
+    setTickets((p) => [newTicket, ...p]);
+    onClose(newTicket);
+  };
+
+  return (
+    <div className="modal" onClick={() => onClose(null)}>
+      <div className="mbox" onClick={(e) => e.stopPropagation()}>
+        <div className="mhd">
+          <h3>{form.kilat && "⚡ "}Terima Servis Baru</h3>
+          <button className="close" onClick={() => onClose(null)}><Ic n="x" /></button>
+        </div>
+        <div className="mbd">
+          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+            {[{ n: 1, t: "Perangkat" }, { n: 2, t: "Pelanggan" }, { n: 3, t: "Servis" }, { n: 4, t: "Konfirmasi" }].map((s) => (
+              <div key={s.n} className={`step ${step === s.n ? "on" : ""}`} onClick={() => setStep(s.n)}>
+                <div className="dot">{s.n}</div><div className="lbl">{s.t}</div>
+              </div>
+            ))}
+          </div>
+
+          {step === 1 && (
+            <>
+              <div className="fld">
+                <label>Jenis Perangkat</label>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {DEVICE_TYPES.map((d) => (
+                    <button key={d.id} className={`btn sm ${form.device === d.id ? "pri" : "gh"}`} onClick={() => upd("device", d.id)}>{d.icon} {d.name}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="row">
+                <div className="fld"><label>Brand / Merek</label><input className="inp" value={form.brand} onChange={(e) => upd("brand", e.target.value)} placeholder="Apple, Samsung, Asus" /></div>
+                <div className="fld"><label>Model / Tipe</label><input className="inp" value={form.model} onChange={(e) => upd("model", e.target.value)} placeholder="iPhone 13, Galaxy A52" /></div>
+              </div>
+              <div className="row">
+                <div className="fld"><label>IMEI / SN</label><input className="inp" value={form.imei} onChange={(e) => upd("imei", e.target.value)} /></div>
+                <div className="fld"><label>Warna</label><input className="inp" value={form.color} onChange={(e) => upd("color", e.target.value)} /></div>
+              </div>
+              <div className="fld"><label>Keluhan / Kerusakan *</label><textarea className="txa" rows={3} value={form.complaint} onChange={(e) => upd("complaint", e.target.value)} /></div>
+              <div className="row">
+                <div className="fld"><label>Aksesoris</label><input className="inp" value={form.accessories} onChange={(e) => upd("accessories", e.target.value)} placeholder="Charger, case" /></div>
+                <div className="fld"><label>Password / PIN</label><input className="inp" value={form.password} onChange={(e) => upd("password", e.target.value)} /></div>
+              </div>
+              <div className="fld">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input type="checkbox" checked={form.kilat} onChange={(e) => upd("kilat", e.target.checked)} />
+                  ⚡ Servis Kilat (prioritas, biaya extra)
+                </label>
+              </div>
+            </>
+          )}
+          {step === 2 && (
+            <>
+              <div className="row">
+                <div className="fld"><label>Nama Lengkap *</label><input className="inp" value={form.custName} onChange={(e) => upd("custName", e.target.value)} /></div>
+                <div className="fld"><label>No HP (WhatsApp) *</label><input className="inp" value={form.custPhone} onChange={(e) => upd("custPhone", e.target.value)} placeholder="0812..." /></div>
+              </div>
+              <div className="fld"><label>Email</label><input className="inp" value={form.custEmail} onChange={(e) => upd("custEmail", e.target.value)} /></div>
+              <div className="fld"><label>Alamat</label><textarea className="txa" rows={2} value={form.custAddr} onChange={(e) => upd("custAddr", e.target.value)} /></div>
+              <div style={{ fontSize: 12, padding: 10, background: "rgba(59,130,246,0.1)", borderRadius: 8, border: "1px solid rgba(59,130,246,0.3)" }}>ℹ️ Jika nomor HP sudah terdaftar, data akan otomatis terhubung.</div>
+            </>
+          )}
+          {step === 3 && (
+            <>
+              <div className="fld">
+                <label>Pilih Jenis Servis</label>
+                <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))" }}>
+                  {SERVICE_CATALOG.map((s) => {
+                    const sel = form.services.find((x) => x.id === s.id);
+                    return (
+                      <div key={s.id} onClick={() => toggleService(s)}
+                        style={{ padding: 10, border: `1px solid ${sel ? "var(--pri)" : "var(--line)"}`, borderRadius: 8, cursor: "pointer", background: sel ? "rgba(249,115,22,0.1)" : "var(--bg2)" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{s.name}</div>
+                        <div style={{ fontSize: 10, color: "var(--txt3)", marginTop: 4 }}>⏱️{s.durasi} • 🛡️{s.warranty}h</div>
+                        <div style={{ fontSize: 12, color: "var(--pri)", fontWeight: 800, marginTop: 4 }}>{rp(s.price)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="row" style={{ marginTop: 14 }}>
+                <div className="fld">
+                  <label>Assign Teknisi</label>
+                  <select className="sel" value={form.technicianId} onChange={(e) => upd("technicianId", e.target.value)}>
+                    <option value="">— Nanti —</option>
+                    {technicians.filter((t) => t.branch === branch).map((t) => <option key={t.id} value={t.id}>{t.name} • ⭐{t.rating}</option>)}
+                  </select>
+                </div>
+                <div className="fld"><label>Estimasi Selesai</label><input className="inp" value={form.estDone} onChange={(e) => upd("estDone", e.target.value)} placeholder="17/04/2026" /></div>
+              </div>
+              <div className="row">
+                <div className="fld"><label>DP / Uang Muka</label><input type="number" className="inp" value={form.dp} onChange={(e) => upd("dp", e.target.value)} /></div>
+                <div className="fld"><label>Catatan</label><input className="inp" value={form.notes} onChange={(e) => upd("notes", e.target.value)} /></div>
+              </div>
+            </>
+          )}
+          {step === 4 && (
+            <>
+              <div style={{ padding: 14, background: "var(--bg2)", borderRadius: 10, marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>Perangkat</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{DEVICE_TYPES.find((d) => d.id === form.device)?.icon} {form.brand} {form.model}</div>
+                <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 8 }}>💬 {form.complaint}</div>
+              </div>
+              <div style={{ padding: 14, background: "var(--bg2)", borderRadius: 10, marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>Pelanggan</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{form.custName}</div>
+                <div style={{ fontSize: 12, color: "var(--txt2)", marginTop: 4 }}>📞 {form.custPhone}</div>
+              </div>
+              <div style={{ padding: 14, background: "var(--bg2)", borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>Servis</div>
+                {form.services.length === 0 ? <div style={{ fontSize: 12, color: "var(--txt3)" }}>Belum ada servis</div>
+                  : form.services.map((s) => <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}><span style={{ fontSize: 13 }}>{s.name}</span><span style={{ fontSize: 13 }}>{rp(s.price)}</span></div>)
+                }
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--pri)", fontWeight: 800 }}>
+                  <span>TOTAL</span><span style={{ color: "var(--pri)", fontSize: 16 }}>{rp(total)}</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="mft">
+          {step > 1 && <button className="btn gh" onClick={() => setStep(step - 1)}><Ic n="back" /> Kembali</button>}
+          <button className="btn gh" onClick={() => onClose(null)}>Batal</button>
+          {step < 4 ? <button className="btn pri" onClick={() => setStep(step + 1)}>Lanjut <Ic n="arrow" /></button>
+                    : <button className="btn pri" onClick={submit}><Ic n="check" /> Buat Tiket</button>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- TICKET DETAIL ----------
+const TicketDetail = ({ ticket, setTickets, technicians, onClose, shop }) => {
+  const [t, setT] = useState(ticket);
+  const [diagMode, setDiagMode] = useState(false);
+  const tech = technicians.find((x) => x.id === t.technicianId);
+  const dev = DEVICE_TYPES.find((d) => d.id === t.device);
+
+  const save = (updates) => {
+    const nt = { ...t, ...updates };
+    setT(nt);
+    setTickets((prev) => prev.map((x) => x.id === nt.id ? nt : x));
+  };
+
+  const sendWA = (msgType) => {
+    const trackUrl = `${window.location.origin}${window.location.pathname}#track-${t.id}`;
+    const msgs = {
+      masuk: `Halo ${t.custName}, terima kasih telah mempercayakan perangkat Anda ke ${shop.name}.\n\n🛠️ Resi: ${t.id}\n📱 Perangkat: ${t.brand} ${t.model}\n💬 Keluhan: ${t.complaint}\n\nLacak status di:\n${trackUrl}`,
+      diagnosa: `Halo ${t.custName}, hasil diagnosa ${t.brand} ${t.model}:\n\n🔍 ${t.diagnosis || "-"}\n💰 Estimasi: ${rp(t.totalCost)}\n\nMohon konfirmasi untuk lanjut perbaikan. 🙏`,
+      selesai: `Halo ${t.custName}, kabar baik! 🎉\n\nPerangkat ${t.brand} ${t.model} sudah selesai diperbaiki.\n\n🛠️ Resi: ${t.id}\n💰 Total: ${rp(t.totalCost)}\n💵 Sisa: ${rp(t.sisa)}\n🛡️ Garansi: ${t.warranty} hari\n\nSilakan diambil. Terima kasih!`,
+    };
+    window.open(waLink(t.custPhone, msgs[msgType]), "_blank");
+  };
+
+  const statusFlow = ["masuk", "antri", "diagnosa", "menunggu", "repair", "selesai", "ambil"];
+  const curIdx = statusFlow.indexOf(t.status);
+
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="mbox" onClick={(e) => e.stopPropagation()}>
+        <div className="mhd">
+          <div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <h3>{t.id}</h3>
+              {t.kilat && <span className="bdg" style={{ background: "rgba(251,191,36,0.2)", color: "var(--acc)" }}>⚡ KILAT</span>}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--txt3)", marginTop: 2 }}>{fFull(t.createdAt)}</div>
+          </div>
+          <button className="close" onClick={onClose}><Ic n="x" /></button>
+        </div>
+        <div className="mbd">
+          <div className="prog-line">
+            {statusFlow.map((s, i) => {
+              const label = STATUS.find((x) => x.id === s)?.label || s;
+              const done = i < curIdx;
+              const on = i === curIdx;
+              return (
+                <React.Fragment key={s}>
+                  <div className={`prog-step ${on ? "on" : ""} ${done ? "done" : ""}`}>
+                    <div className="dot">{done ? "✓" : i + 1}</div>
+                    <div className="lbl">{label}</div>
                   </div>
-                  <Badge s={item.status}/>
+                  {i < statusFlow.length - 1 && <div className={`prog-bar ${done ? "done" : ""}`} />}
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="card" style={{ padding: 14 }}>
+              <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>👤 Pelanggan</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{t.custName}</div>
+              <div style={{ fontSize: 12, color: "var(--txt2)", marginTop: 4 }}>📞 {t.custPhone}</div>
+              <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                <button className="btn wa sm" onClick={() => sendWA("masuk")}><Ic n="wa" s={12} /> Masuk</button>
+                <button className="btn wa sm" onClick={() => sendWA("diagnosa")}>Diagnosa</button>
+                <button className="btn wa sm" onClick={() => sendWA("selesai")}>Selesai</button>
+              </div>
+            </div>
+            <div className="card" style={{ padding: 14 }}>
+              <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>{dev?.icon} Perangkat</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{t.brand} {t.model}</div>
+              <div style={{ fontSize: 12, color: "var(--txt2)", marginTop: 4 }}>IMEI: {t.imei || "-"} • {t.color}</div>
+              {t.accessories && <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 4 }}>Aksesoris: {t.accessories}</div>}
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 14, marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>💬 Keluhan</div>
+            <div style={{ fontSize: 13 }}>{t.complaint}</div>
+            {t.diagnosis && (
+              <>
+                <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginTop: 12, marginBottom: 6 }}>🔍 Diagnosa</div>
+                <div style={{ fontSize: 13 }}>{t.diagnosis}</div>
+              </>
+            )}
+            {!diagMode ? (
+              <button className="btn gh sm" style={{ marginTop: 10 }} onClick={() => setDiagMode(true)}><Ic n="edit" s={12} /> Edit Diagnosa</button>
+            ) : (
+              <div style={{ marginTop: 10 }}>
+                <textarea className="txa" rows={3} value={t.diagnosis} onChange={(e) => setT({ ...t, diagnosis: e.target.value })} />
+                <div style={{ marginTop: 6 }}>
+                  <button className="btn pri sm" onClick={() => { save({ diagnosis: t.diagnosis }); setDiagMode(false); }}>Simpan</button>
+                  <button className="btn gh sm" onClick={() => setDiagMode(false)} style={{ marginLeft: 6 }}>Batal</button>
                 </div>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,paddingTop:10,borderTop:`1px solid ${T.dv}`}}>
-                  <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:8,fontSize:11,fontWeight:700,background:dark?"#1E293B":"#FEF2F2",color:"#EF4444"}}>🔧 {item.kerusakan}</span>
-                  <span style={{fontSize:11,color:T.tm,fontWeight:600}}>{daysAgo(item.tanggalMasuk)}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="card" style={{ padding: 14, marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>💰 Rincian Biaya</div>
+            {t.services.map((s) => (
+              <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                <span style={{ fontSize: 13 }}>{s.name}</span><span style={{ fontSize: 13 }}>{rp(s.price)}</span>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line)", fontWeight: 700 }}>
+              <span>Total</span><span style={{ color: "var(--pri)" }}>{rp(t.totalCost)}</span>
+            </div>
+            {t.dp > 0 && (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--txt2)", marginTop: 4 }}><span>DP</span><span>{rp(t.dp)}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--warn)", fontWeight: 700, marginTop: 2 }}><span>Sisa</span><span>{rp(t.sisa)}</span></div>
+              </>
+            )}
+            <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 10 }}>🛡️ Garansi: {t.warranty} hari • 🔧 {tech?.name || "Belum di-assign"}</div>
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>Update Status</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {STATUS.map((s) => (
+                <button key={s.id} className={`btn sm ${t.status === s.id ? "pri" : "gh"}`} onClick={() => save({ status: s.id })}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mft">
+          <button className="btn gh" onClick={() => window.print()}><Ic n="print" /> Print</button>
+          <button className="btn pri" onClick={onClose}>Tutup</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- INVENTARIS ----------
+const InventoryPage = ({ products, setProducts, suppliers, purchases, setPurchases }) => {
+  const [q, setQ] = useState("");
+  const [editProd, setEditProd] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [showSup, setShowSup] = useState(false);
+  const [showHist, setShowHist] = useState(false);
+  const [showKulakan, setShowKulakan] = useState(false);
+
+  const filtered = products.filter((p) => !q || p.name.toLowerCase().includes(q.toLowerCase()) || p.barcode?.includes(q));
+  const low = products.filter((p) => p.stock < 5);
+
+  const exportProducts = () => {
+    const rows = [["Nama", "Kategori", "Stok", "Harga Jual", "Modal", "Margin", "Nilai Stok", "Barcode"]];
+    products.forEach((p) => rows.push([p.name, p.cat, p.stock, p.price, p.modal, p.price - p.modal, p.stock * p.price, p.barcode]));
+    downloadCSV(`inventaris-${Date.now()}.csv`, rows);
+  };
+
+  return (
+    <div className="cnt">
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <input className="inp" placeholder="🔍 Cari produk..." value={q} onChange={(e) => setQ(e.target.value)} style={{ flex: 1, minWidth: 200 }} />
+        <button className="btn gh" onClick={() => setShowSup(true)}><Ic n="truck" s={14} /> Supplier</button>
+        <button className="btn gh" onClick={() => setShowHist(true)}><Ic n="history" s={14} /> Riwayat Kulakan</button>
+        <button className="btn ok" onClick={() => setShowKulakan(true)}><Ic n="plus" s={14} /> Kulakan</button>
+        <button className="btn gh icn" onClick={exportProducts} title="Export CSV"><Ic n="download" s={14} /></button>
+        <button className="btn pri" onClick={() => setShowAdd(true)}><Ic n="plus" s={14} /> Tambah Produk</button>
+      </div>
+
+      {low.length > 0 && (
+        <div className="card" style={{ marginBottom: 14, background: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.3)" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <Ic n="alert" s={20} c="var(--err)" />
+            <div>
+              <div style={{ fontWeight: 700, color: "var(--err)" }}>Stok Menipis</div>
+              <div style={{ fontSize: 12, color: "var(--txt2)" }}>{low.length} produk stok &lt; 5 unit</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))" }}>
+        {filtered.map((p) => (
+          <div key={p.id} className="card" style={{ padding: 12 }}>
+            <div style={{ width: "100%", aspectRatio: "1", background: "var(--bg2)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 60, marginBottom: 10 }}>{p.img}</div>
+            <div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700 }}>{PRODUCT_CATS.find(c => c.id === p.cat)?.name}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, lineHeight: 1.3 }}>{p.name}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11, color: "var(--txt3)" }}>
+              <span>Harga Jual</span><span>Stok</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "var(--pri)" }}>{rp(p.price)}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: p.stock < 5 ? "var(--err)" : "var(--ok)" }}>{p.stock} pcs</span>
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+              <button className="btn gh sm" style={{ flex: 1, justifyContent: "center" }} onClick={() => setEditProd(p)}><Ic n="edit" s={12} /> Edit</button>
+              <button className="btn gh sm" style={{ flex: 1, justifyContent: "center" }} onClick={() => {
+                const n = prompt("Tambah stok:", "0");
+                if (n) setProducts(products.map((x) => x.id === p.id ? { ...x, stock: x.stock + Number(n) } : x));
+              }}>📦 Stok</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {(showAdd || editProd) && <ProductFormModal product={editProd} suppliers={suppliers} onClose={() => { setShowAdd(false); setEditProd(null); }} onSave={(p) => {
+        if (editProd) setProducts(products.map((x) => x.id === p.id ? p : x));
+        else setProducts([...products, { ...p, id: gid("PROD") }]);
+        setShowAdd(false); setEditProd(null);
+      }} />}
+      {showSup && <SupplierModal suppliers={suppliers} onClose={() => setShowSup(false)} />}
+      {showHist && <PurchaseHistoryModal purchases={purchases} suppliers={suppliers} onClose={() => setShowHist(false)} />}
+      {showKulakan && <KulakanModal products={products} setProducts={setProducts} suppliers={suppliers} purchases={purchases} setPurchases={setPurchases} onClose={() => setShowKulakan(false)} />}
+    </div>
+  );
+};
+
+const ProductFormModal = ({ product, suppliers, onClose, onSave }) => {
+  const [f, setF] = useState(product || { name: "", cat: "spare", stock: 0, price: 0, modal: 0, img: "📦", supplier: suppliers[0]?.id || "", barcode: "" });
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="mbox" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+        <div className="mhd"><h3>{product ? "Edit" : "Tambah"} Produk</h3><button className="close" onClick={onClose}><Ic n="x" /></button></div>
+        <div className="mbd">
+          <div className="row">
+            <div className="fld" style={{ flex: 0, minWidth: 80 }}><label>Icon</label><input className="inp" value={f.img} onChange={(e) => setF({ ...f, img: e.target.value })} style={{ fontSize: 24, textAlign: "center" }} /></div>
+            <div className="fld"><label>Nama Produk *</label><input className="inp" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
+          </div>
+          <div className="row">
+            <div className="fld"><label>Kategori</label><select className="sel" value={f.cat} onChange={(e) => setF({ ...f, cat: e.target.value })}>{PRODUCT_CATS.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}</select></div>
+            <div className="fld"><label>Supplier</label><select className="sel" value={f.supplier} onChange={(e) => setF({ ...f, supplier: e.target.value })}><option value="">-</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+          </div>
+          <div className="row">
+            <div className="fld"><label>Harga Modal</label><input type="number" className="inp" value={f.modal} onChange={(e) => setF({ ...f, modal: Number(e.target.value) })} /></div>
+            <div className="fld"><label>Harga Jual *</label><input type="number" className="inp" value={f.price} onChange={(e) => setF({ ...f, price: Number(e.target.value) })} /></div>
+          </div>
+          <div className="row">
+            <div className="fld"><label>Stok Awal</label><input type="number" className="inp" value={f.stock} onChange={(e) => setF({ ...f, stock: Number(e.target.value) })} /></div>
+            <div className="fld"><label>Barcode</label><input className="inp" value={f.barcode} onChange={(e) => setF({ ...f, barcode: e.target.value })} /></div>
+          </div>
+          {f.price > 0 && f.modal > 0 && (
+            <div style={{ padding: 10, background: "rgba(16,185,129,0.1)", borderRadius: 8, fontSize: 12 }}>
+              💰 Margin: <b style={{ color: "var(--ok)" }}>{rp(f.price - f.modal)}</b> ({Math.round((f.price - f.modal) / f.modal * 100)}%)
+            </div>
+          )}
+        </div>
+        <div className="mft"><button className="btn gh" onClick={onClose}>Batal</button><button className="btn pri" onClick={() => onSave(f)}><Ic n="check" /> Simpan</button></div>
+      </div>
+    </div>
+  );
+};
+
+const SupplierModal = ({ suppliers, onClose }) => (
+  <div className="modal" onClick={onClose}>
+    <div className="mbox" onClick={(e) => e.stopPropagation()}>
+      <div className="mhd"><h3><Ic n="truck" /> Daftar Supplier</h3><button className="close" onClick={onClose}><Ic n="x" /></button></div>
+      <div className="mbd">
+        {suppliers.map((s) => (
+          <div key={s.id} className="card" style={{ marginBottom: 8, padding: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{s.name}</div>
+                <div style={{ fontSize: 12, color: "var(--txt2)", marginTop: 4 }}>📞 {s.phone}</div>
+                <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 2 }}>{s.addr}</div>
+              </div>
+              <a className="btn wa sm" href={waLink(s.phone, "Halo, kami ingin pesan barang")} target="_blank" rel="noreferrer"><Ic n="wa" s={12} /> WA</a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const PurchaseHistoryModal = ({ purchases, suppliers, onClose }) => (
+  <div className="modal" onClick={onClose}>
+    <div className="mbox" onClick={(e) => e.stopPropagation()}>
+      <div className="mhd"><h3><Ic n="history" /> Riwayat Kulakan</h3><button className="close" onClick={onClose}><Ic n="x" /></button></div>
+      <div className="mbd">
+        <table className="tbl">
+          <thead><tr><th>ID</th><th>Tanggal</th><th>Supplier</th><th>Items</th><th className="n">Total</th></tr></thead>
+          <tbody>
+            {purchases.map((p) => (
+              <tr key={p.id}>
+                <td><span className="tck-id">{p.id}</span></td>
+                <td style={{ fontSize: 12 }}>{fD(p.createdAt)}</td>
+                <td>{suppliers.find((s) => s.id === p.supplierId)?.name}</td>
+                <td><span className="chip">{p.items.length} produk</span></td>
+                <td className="n" style={{ color: "var(--pri)", fontWeight: 700 }}>{rp(p.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+);
+
+const KulakanModal = ({ products, setProducts, suppliers, purchases, setPurchases, onClose }) => {
+  const [supplierId, setSupplierId] = useState(suppliers[0]?.id || "");
+  const [items, setItems] = useState([]);
+  const [notes, setNotes] = useState("");
+
+  const addItem = (p) => {
+    if (items.find((x) => x.id === p.id)) return;
+    setItems([...items, { id: p.id, name: p.name, qty: 1, price: p.modal }]);
+  };
+  const updItem = (id, k, v) => setItems(items.map((x) => x.id === id ? { ...x, [k]: v } : x));
+  const removeItem = (id) => setItems(items.filter((x) => x.id !== id));
+  const total = items.reduce((s, x) => s + x.qty * x.price, 0);
+
+  const submit = () => {
+    if (items.length === 0) return alert("Tambah minimal 1 produk");
+    const po = { id: gid("PO"), branch: "b1", supplierId, items, total, createdAt: Date.now(), notes };
+    setPurchases([po, ...purchases]);
+    setProducts(products.map((p) => {
+      const i = items.find((x) => x.id === p.id);
+      return i ? { ...p, stock: p.stock + i.qty, modal: i.price } : p;
+    }));
+    alert(`Kulakan berhasil! ${items.length} produk masuk stok.`);
+    onClose();
+  };
+
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="mbox" onClick={(e) => e.stopPropagation()}>
+        <div className="mhd"><h3>🛒 Kulakan / Pembelian Stok</h3><button className="close" onClick={onClose}><Ic n="x" /></button></div>
+        <div className="mbd">
+          <div className="fld">
+            <label>Supplier</label>
+            <select className="sel" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div className="fld">
+            <label>Pilih Produk</label>
+            <select className="sel" onChange={(e) => { const p = products.find((x) => x.id === e.target.value); if (p) addItem(p); e.target.value = ""; }}>
+              <option value="">+ Pilih produk...</option>
+              {products.map((p) => <option key={p.id} value={p.id}>{p.name} (stok: {p.stock})</option>)}
+            </select>
+          </div>
+          {items.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <label style={{ fontSize: 11, color: "var(--txt2)", textTransform: "uppercase", fontWeight: 600 }}>Items</label>
+              {items.map((it) => (
+                <div key={it.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: 8, background: "var(--bg2)", borderRadius: 8, marginBottom: 6 }}>
+                  <div style={{ flex: 1, fontSize: 12, fontWeight: 700 }}>{it.name}</div>
+                  <input type="number" className="inp" value={it.qty} onChange={(e) => updItem(it.id, "qty", Number(e.target.value))} style={{ width: 70, padding: 6 }} />
+                  <input type="number" className="inp" value={it.price} onChange={(e) => updItem(it.id, "price", Number(e.target.value))} style={{ width: 100, padding: 6 }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, minWidth: 90, textAlign: "right" }}>{rp(it.qty * it.price)}</span>
+                  <button className="close" onClick={() => removeItem(it.id)}><Ic n="x" s={14} /></button>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginTop:8,flexWrap:"wrap"}}>
-                  {Number(item.biayaEstimasi) > 0 && <span style={{fontSize:13,fontWeight:800,color:"#3B82F6"}}>{rp(item.biayaEstimasi)}</span>}
-                  {item.prioritas && item.prioritas !== "Normal" && <span style={{fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:6,background:item.prioritas==="Express"?"#FEF2F2":"#FFFBEB",color:item.prioritas==="Express"?"#EF4444":"#F59E0B"}}>{item.prioritas==="Express"?"🔴":"🟡"} {item.prioritas}</span>}
-                  {item.garansi === "Ya" && <span style={{fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:6,background:"#ECFDF5",color:"#10B981"}}>✅ Garansi</span>}
-                  {Number(item.rating) > 0 && <span style={{fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:6,background:"#FFFBEB",color:"#F59E0B"}}>⭐ {item.rating}</span>}
+              ))}
+              <div style={{ padding: 12, background: "var(--bg2)", borderRadius: 8, marginTop: 10, display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
+                <span>TOTAL</span><span style={{ color: "var(--pri)", fontSize: 16 }}>{rp(total)}</span>
+              </div>
+            </div>
+          )}
+          <div className="fld" style={{ marginTop: 12 }}><label>Catatan</label><input className="inp" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+        </div>
+        <div className="mft">
+          <button className="btn gh" onClick={onClose}>Batal</button>
+          <button className="btn pri" disabled={items.length === 0} onClick={submit}><Ic n="check" /> Proses Kulakan</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- TRACKING PUBLIK ----------
+const TrackingPage = ({ tickets }) => {
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState(null);
+  const track = () => {
+    const t = tickets.find((x) => x.id.toLowerCase() === q.trim().toLowerCase());
+    if (t) setFound(t);
+    else { alert("Resi tidak ditemukan"); setFound(null); }
+  };
+  const statusFlow = ["masuk", "antri", "diagnosa", "menunggu", "repair", "selesai", "ambil"];
+  const curIdx = found ? statusFlow.indexOf(found.status) : -1;
+
+  return (
+    <div className="cnt" style={{ maxWidth: 720 }}>
+      <div className="track-hero">
+        <div style={{ fontSize: 42, marginBottom: 8 }}>🔍</div>
+        <h2 style={{ fontSize: 22, fontWeight: 800 }}>Lacak Status Perbaikan</h2>
+        <p style={{ fontSize: 13, color: "var(--txt2)", marginTop: 6 }}>Masukkan nomor resi untuk melihat progres</p>
+        <div style={{ display: "flex", gap: 8, marginTop: 18, maxWidth: 420, margin: "18px auto 0" }}>
+          <input className="inp" placeholder="Contoh: GK4PLLCMYL" value={q} onChange={(e) => setQ(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && track()} />
+          <button className="btn pri" onClick={track}><Ic n="search" /> Lacak</button>
+        </div>
+      </div>
+
+      {found && (
+        <div className="card" style={{ marginTop: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700 }}>Resi</div>
+              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: "monospace" }}>{found.id}</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>{found.brand} {found.model} • {found.custName}</div>
+            </div>
+            <StatusBadge st={found.status} />
+          </div>
+          <div className="prog-line">
+            {statusFlow.map((s, i) => {
+              const label = STATUS.find((x) => x.id === s)?.label || s;
+              const done = i < curIdx;
+              const on = i === curIdx;
+              return (
+                <React.Fragment key={s}>
+                  <div className={`prog-step ${on ? "on" : ""} ${done ? "done" : ""}`}>
+                    <div className="dot">{done ? "✓" : i + 1}</div><div className="lbl">{label}</div>
+                  </div>
+                  {i < statusFlow.length - 1 && <div className={`prog-bar ${done ? "done" : ""}`} />}
+                </React.Fragment>
+              );
+            })}
+          </div>
+          <div style={{ padding: 14, background: "var(--bg2)", borderRadius: 10, marginTop: 14 }}>
+            <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>💬 Keluhan</div>
+            <div style={{ fontSize: 13 }}>{found.complaint}</div>
+            {found.diagnosis && (
+              <>
+                <div style={{ fontSize: 11, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginTop: 12, marginBottom: 6 }}>🔍 Diagnosa</div>
+                <div style={{ fontSize: 13 }}>{found.diagnosis}</div>
+              </>
+            )}
+          </div>
+          <div className="row" style={{ marginTop: 14 }}>
+            <div className="card" style={{ padding: 12 }}><div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700 }}>Estimasi</div><div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>{found.estDone || "-"}</div></div>
+            <div className="card" style={{ padding: 12 }}><div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700 }}>Total</div><div style={{ fontSize: 14, fontWeight: 700, marginTop: 4, color: "var(--pri)" }}>{rp(found.totalCost)}</div></div>
+            <div className="card" style={{ padding: 12 }}><div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700 }}>Garansi</div><div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>{found.warranty} hari</div></div>
+          </div>
+          <div style={{ marginTop: 14, padding: 16, background: "#fff", borderRadius: 10, textAlign: "center" }}>
+            <div style={{ color: "#000", fontSize: 12, marginBottom: 8, fontWeight: 700 }}>QR Kode Resi</div>
+            <QR value={found.id} size={140} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------- CUSTOMERS ----------
+const CustomerPage = ({ customers, setCustomers, tickets }) => {
+  const [q, setQ] = useState("");
+  const [mod, setMod] = useState(false);
+  const [frm, setFrm] = useState({ name: "", phone: "", email: "", address: "" });
+  const enriched = customers.map((c) => {
+    const ct = tickets.filter((t) => t.customerId === c.id);
+    const totalSpent = ct.filter((t) => ["selesai", "ambil"].includes(t.status)).reduce((s, t) => s + t.totalCost, 0);
+    return { ...c, visits: ct.length, totalSpent };
+  }).filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()) || c.phone.includes(q));
+  const add = () => {
+    if (!frm.name || !frm.phone) return alert("Isi nama & no HP");
+    setCustomers([...customers, { id: gid("CUST"), ...frm }]);
+    setFrm({ name: "", phone: "", email: "", address: "" });
+    setMod(false);
+  };
+  return (
+    <div className="cnt">
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        <input className="inp" placeholder="Cari nama atau no HP…" value={q} onChange={(e) => setQ(e.target.value)} style={{ flex: 1 }} />
+        <button className="btn pri" onClick={() => setMod(true)}><Ic n="plus" /> Pelanggan Baru</button>
+      </div>
+      <div className="card">
+        <table className="tbl">
+          <thead><tr><th>Nama</th><th>No HP</th><th>Kunjungan</th><th className="n">Total Belanja</th><th>Aksi</th></tr></thead>
+          <tbody>
+            {enriched.map((c) => (
+              <tr key={c.id}>
+                <td><b>{c.name}</b></td>
+                <td>{c.phone}</td>
+                <td><span className="chip">{c.visits}×</span></td>
+                <td className="n" style={{ color: "var(--pri)", fontWeight: 700 }}>{rp(c.totalSpent)}</td>
+                <td><a className="btn wa sm" href={waLink(c.phone, `Halo ${c.name}`)} target="_blank" rel="noreferrer"><Ic n="wa" s={12} /> WA</a></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {mod && (
+        <div className="modal" onClick={() => setMod(false)}>
+          <div className="mbox" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mhd"><h3>Pelanggan Baru</h3><button className="close" onClick={() => setMod(false)}><Ic n="x" /></button></div>
+            <div className="mbd">
+              <div className="fld"><label>Nama *</label><input className="inp" value={frm.name} onChange={(e) => setFrm({ ...frm, name: e.target.value })} /></div>
+              <div className="fld"><label>No HP *</label><input className="inp" value={frm.phone} onChange={(e) => setFrm({ ...frm, phone: e.target.value })} /></div>
+              <div className="fld"><label>Email</label><input className="inp" value={frm.email} onChange={(e) => setFrm({ ...frm, email: e.target.value })} /></div>
+              <div className="fld"><label>Alamat</label><textarea className="txa" rows={2} value={frm.address} onChange={(e) => setFrm({ ...frm, address: e.target.value })} /></div>
+            </div>
+            <div className="mft"><button className="btn gh" onClick={() => setMod(false)}>Batal</button><button className="btn pri" onClick={add}><Ic n="check" /> Simpan</button></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------- TECHNICIANS ----------
+const TechnicianPage = ({ technicians, tickets, branch }) => {
+  const bt = technicians.filter((t) => t.branch === branch);
+  return (
+    <div className="cnt">
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))" }}>
+        {bt.map((t) => {
+          const active = tickets.filter((x) => x.technicianId === t.id && !["selesai", "ambil", "batal"].includes(x.status)).length;
+          return (
+            <div key={t.id} className="card">
+              <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+                <div className="avatar" style={{ width: 54, height: 54, fontSize: 20 }}>{t.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt3)" }}>{t.spec}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 2 }}>📞 {t.phone}</div>
+                </div>
+              </div>
+              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                <div style={{ padding: 10, background: "var(--bg2)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "var(--acc)" }}>⭐{t.rating}</div>
+                  <div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase" }}>Rating</div>
+                </div>
+                <div style={{ padding: 10, background: "var(--bg2)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "var(--ok)" }}>{t.done}</div>
+                  <div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase" }}>Selesai</div>
+                </div>
+                <div style={{ padding: 10, background: "var(--bg2)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "var(--pri)" }}>{active}</div>
+                  <div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase" }}>Aktif</div>
                 </div>
               </div>
             </div>
-          </div>;
+          );
         })}
-  </div>;
-
-  /* ═══ MAIN RENDER ═══ */
-  return <div style={base}>
-    <style>{CSS}</style>
-
-    {tab === "home" && renderHome()}
-    {tab === "list" && renderList()}
-    {tab === "board" && renderBoard()}
-    {tab === "stats" && renderStats()}
-    {tab === "more" && renderMore()}
-
-    {/* FAB */}
-    <button onClick={() => {setPage("form"); setStep(0); setErrs({}); setFd(initFd);}} className="tap btn-primary" style={{position:"fixed",bottom:88,right:"calc(50% - 218px)",width:62,height:62,borderRadius:22,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:99,border:"none",animation:"glow 2.5s ease infinite"}}><Ico n="plus" s={28}/></button>
-
-    {/* Bottom Nav */}
-    <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:T.card,display:"flex",justifyContent:"space-around",padding:"10px 0 max(14px, env(safe-area-inset-bottom))",borderTop:`1px solid ${T.cb}`,zIndex:100,boxShadow:"0 -4px 24px rgba(0,0,0,0.06)"}}>
-      {[
-        ["home","Beranda","home"],
-        ["list","Daftar","list"],
-        ["board","Board","grid"],
-        ["stats","Laporan","chart"],
-        ["more","Lainnya","settings"],
-      ].map((item,i) => {
-        const act = tab === item[0];
-        return <div key={i} onClick={() => {setTab(item[0]); setPage("main");}} className="tap" style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"4px 10px",cursor:"pointer",color:act?"#3B82F6":T.tm,position:"relative"}}>
-          <div style={{transform:act?"scale(1.15)":"scale(1)",transition:"transform .25s cubic-bezier(.34,1.56,.64,1)"}}><Ico n={item[2]} s={act?23:21}/></div>
-          <span style={{fontSize:10,fontWeight:act?800:600}}>{item[1]}</span>
-          {act && <div style={{width:5,height:5,borderRadius:"50%",background:"#3B82F6",position:"absolute",bottom:-2}}/>}
-        </div>;
-      })}
+      </div>
     </div>
+  );
+};
 
-    {nota && <Nota item={nota} onClose={() => setNota(null)}/>}
-    {modal && <Modal {...modal} onNo={() => setModal(null)}/>}
-    <Toast d={toast}/>
-  </div>;
+// ---------- HISTORY ----------
+const HistoryPage = ({ tickets, sales, branch, shop }) => {
+  const [tab, setTab] = useState("sales");
+  const [printSale, setPrintSale] = useState(null);
+  const bs = sales.filter((s) => s.branch === branch);
+  const bt = tickets.filter((t) => t.branch === branch && t.status === "ambil");
+
+  const exportSales = () => {
+    const rows = [["Resi", "Tanggal", "Pelanggan", "Items", "Total", "Pembayaran"]];
+    bs.forEach((s) => rows.push([s.id, fFull(s.createdAt), s.custName, s.items.length, s.total, s.payMethod.toUpperCase()]));
+    downloadCSV(`riwayat-penjualan-${Date.now()}.csv`, rows);
+  };
+
+  return (
+    <div className="cnt">
+      <div className="card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 800 }}>🕒 Riwayat Transaksi</h3>
+          <button className="btn gh sm" onClick={exportSales}><Ic n="download" s={12} /> Export CSV</button>
+        </div>
+        <div className="tabs">
+          <button className={`tab ${tab === "sales" ? "on" : ""}`} onClick={() => setTab("sales")}>📋 Penjualan (POS)</button>
+          <button className={`tab ${tab === "service" ? "on" : ""}`} onClick={() => setTab("service")}>✓ Servis Diambil</button>
+        </div>
+        {tab === "sales" ? (
+          <table className="tbl">
+            <thead><tr><th>Resi / Waktu</th><th>Pelanggan</th><th>Item</th><th className="n">Total</th><th>Pembayaran</th><th>Aksi</th></tr></thead>
+            <tbody>
+              {bs.map((s) => (
+                <tr key={s.id}>
+                  <td><div style={{ fontFamily: "monospace", fontWeight: 700 }}>{s.id}</div><div style={{ fontSize: 11, color: "var(--txt3)" }}>{fFull(s.createdAt)}</div></td>
+                  <td>{s.custName}</td>
+                  <td><span className="chip">{s.items.length} produk</span></td>
+                  <td className="n" style={{ color: "var(--pri)", fontWeight: 700 }}>{rp(s.total)}</td>
+                  <td><span style={{ color: "var(--ok)", fontWeight: 700 }}>LUNAS - {s.payMethod.toUpperCase()}</span></td>
+                  <td>
+                    <button className="btn icn gh" onClick={() => setPrintSale(s)}><Ic n="print" s={14} /></button>
+                    <a className="btn icn wa" href={waLink(shop.waCS, `Bukti ${s.id} - ${rp(s.total)}`)} target="_blank" rel="noreferrer" style={{ marginLeft: 4 }}><Ic n="wa" s={14} /></a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <table className="tbl">
+            <thead><tr><th>Resi</th><th>Pelanggan</th><th>Perangkat</th><th>Tanggal Selesai</th><th className="n">Total</th></tr></thead>
+            <tbody>
+              {bt.map((t) => (
+                <tr key={t.id}>
+                  <td><span className="tck-id">{t.id}</span></td>
+                  <td>{t.custName}</td>
+                  <td>{t.brand} {t.model}</td>
+                  <td style={{ fontSize: 12 }}>{fD(t.createdAt)}</td>
+                  <td className="n" style={{ color: "var(--pri)", fontWeight: 700 }}>{rp(t.totalCost)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {printSale && <ReceiptModal sale={printSale} shop={shop} branch={branch} onClose={() => setPrintSale(null)} />}
+    </div>
+  );
+};
+
+// ---------- REPORT ----------
+const ReportPage = ({ tickets, sales, products, technicians, branch }) => {
+  const [period, setPeriod] = useState("month");
+  const bt = tickets.filter((t) => t.branch === branch);
+  const bs = sales.filter((s) => s.branch === branch);
+  const totalSales = bs.reduce((s, x) => s + x.total, 0);
+  const avgSales = bs.length ? totalSales / bs.length : 0;
+  const totalService = bt.filter((t) => ["selesai", "ambil"].includes(t.status)).reduce((s, t) => s + t.totalCost, 0);
+  const stockValue = products.reduce((s, p) => s + p.stock * p.modal, 0);
+  const lowStock = products.filter((p) => p.stock < 5);
+  const byPay = {};
+  bs.forEach((s) => { byPay[s.payMethod] = (byPay[s.payMethod] || 0) + s.total; });
+  const byDevice = DEVICE_TYPES.map((d) => ({ ...d, count: bt.filter((t) => t.device === d.id).length }));
+  const byTech = technicians.filter((t) => t.branch === branch).map((t) => {
+    const ct = bt.filter((x) => x.technicianId === t.id);
+    return { ...t, tickets: ct.length, omset: ct.filter((x) => ["selesai", "ambil"].includes(x.status)).reduce((s, x) => s + x.totalCost, 0) };
+  }).sort((a, b) => b.omset - a.omset);
+
+  const exportReport = () => {
+    const rows = [
+      ["LAPORAN PENJUALAN"],
+      ["Total Penjualan", rp(totalSales)],
+      ["Total Transaksi", bs.length],
+      ["Rata-rata", rp(avgSales)],
+      [],
+      ["Per Metode Pembayaran"],
+      ...Object.entries(byPay).map(([m, v]) => [m.toUpperCase(), rp(v)]),
+      [],
+      ["LAPORAN SERVIS"],
+      ["Total Omset Servis", rp(totalService)],
+      ["Total Tiket", bt.length],
+      [],
+      ["LAPORAN STOK"],
+      ["Total Produk", products.length],
+      ["Nilai Stok", rp(stockValue)],
+      ["Stok Rendah", lowStock.length],
+    ];
+    downloadCSV(`laporan-${period}-${Date.now()}.csv`, rows);
+  };
+
+  return (
+    <div className="cnt">
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <h3 style={{ fontSize: 18, fontWeight: 800 }}>📊 Laporan Bisnis</h3>
+        <div style={{ display: "flex", gap: 8 }}>
+          <select className="sel" value={period} onChange={(e) => setPeriod(e.target.value)} style={{ width: 140 }}>
+            <option value="today">Hari Ini</option>
+            <option value="week">Minggu Ini</option>
+            <option value="month">Bulan Ini</option>
+            <option value="year">Tahun Ini</option>
+          </select>
+          <button className="btn gh" onClick={exportReport}><Ic n="download" s={14} /> CSV</button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h4 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>📈 Laporan Penjualan ({period})</h4>
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 12 }}>
+          <div className="kpi"><div className="lbl">Total Penjualan</div><div className="v" style={{ fontSize: 22 }}>{rp(totalSales)}</div></div>
+          <div className="kpi alt"><div className="lbl">Total Transaksi</div><div className="v">{bs.length}</div></div>
+          <div className="kpi alt2"><div className="lbl">Rata-rata</div><div className="v" style={{ fontSize: 22 }}>{rp(avgSales)}</div></div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 11, color: "var(--txt3)", marginBottom: 6, fontWeight: 700, textTransform: "uppercase" }}>Per Metode Pembayaran</div>
+          {Object.entries(byPay).map(([m, v]) => (
+            <div key={m} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px dashed var(--line)" }}>
+              <span>{PAY_METHODS.find(p => p.id === m)?.icon} {m.toUpperCase()}</span>
+              <span style={{ fontWeight: 700 }}>{rp(v)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h4 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>🔧 Laporan Servis</h4>
+        <div className="row">
+          <div className="kpi"><div className="lbl">Omset Servis</div><div className="v" style={{ fontSize: 20 }}>{rp(totalService)}</div></div>
+          <div className="kpi alt"><div className="lbl">Total Tiket</div><div className="v">{bt.length}</div></div>
+          <div className="kpi alt2"><div className="lbl">Selesai</div><div className="v">{bt.filter(t => ["selesai", "ambil"].includes(t.status)).length}</div></div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 11, color: "var(--txt3)", marginBottom: 8, fontWeight: 700, textTransform: "uppercase" }}>Per Jenis Perangkat</div>
+          {byDevice.map((d) => (
+            <div key={d.id} style={{ marginBottom: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+                <span>{d.icon} {d.name}</span><span>{d.count}</span>
+              </div>
+              <div style={{ height: 6, background: "var(--bg2)", borderRadius: 3 }}>
+                <div style={{ height: "100%", width: `${bt.length ? (d.count / bt.length) * 100 : 0}%`, background: "linear-gradient(90deg,var(--pri),var(--acc))", borderRadius: 3 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h4 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>📦 Laporan Stok</h4>
+        <div className="row">
+          <div className="kpi"><div className="lbl">Total Produk</div><div className="v">{products.length}</div></div>
+          <div className="kpi alt"><div className="lbl">Nilai Stok</div><div className="v" style={{ fontSize: 18 }}>{rp(stockValue)}</div></div>
+          <div className="kpi alt4"><div className="lbl">Stok Rendah</div><div className="v" style={{ color: lowStock.length ? "var(--err)" : "var(--ok)" }}>{lowStock.length}</div></div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h4 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>🔧 Performa Teknisi</h4>
+        <table className="tbl">
+          <thead><tr><th>Teknisi</th><th>Spesialisasi</th><th>Rating</th><th>Tiket</th><th className="n">Omset</th></tr></thead>
+          <tbody>
+            {byTech.map((t) => (
+              <tr key={t.id}>
+                <td><b>{t.name}</b></td>
+                <td>{t.spec}</td>
+                <td style={{ color: "var(--acc)" }}>⭐ {t.rating}</td>
+                <td><span className="chip">{t.tickets}</span></td>
+                <td className="n" style={{ color: "var(--pri)", fontWeight: 700 }}>{rp(t.omset)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ---------- SETTINGS ----------
+const SettingPage = ({ shop, setShop, users, setUsers }) => {
+  const [showUserMod, setShowUserMod] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  return (
+    <div className="cnt">
+      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div className="card">
+          <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}>🏪 Profil Toko</h3>
+          <div style={{ textAlign: "center", marginBottom: 16 }}>
+            <div style={{ width: 80, height: 80, margin: "0 auto", borderRadius: "50%", background: "linear-gradient(135deg,var(--pri),var(--acc))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, color: "#fff", fontWeight: 800 }}>
+              {shop.name.split(" ").map(w => w[0]).slice(0, 2).join("")}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 6 }}>Logo Toko</div>
+          </div>
+          <div className="fld"><label>Nama Toko</label><input className="inp" value={shop.name} onChange={(e) => setShop({ ...shop, name: e.target.value })} /></div>
+          <div className="fld"><label>Alamat</label><textarea className="txa" rows={2} value={shop.address} onChange={(e) => setShop({ ...shop, address: e.target.value })} /></div>
+          <div className="fld"><label>No HP / WA</label><input className="inp" value={shop.waCS} onChange={(e) => setShop({ ...shop, waCS: e.target.value })} /></div>
+          <div className="fld"><label>Email</label><input className="inp" value={shop.email} onChange={(e) => setShop({ ...shop, email: e.target.value })} /></div>
+          <div className="fld"><label>Catatan Kaki Struk Kasir</label><input className="inp" value={shop.receiptFooter} onChange={(e) => setShop({ ...shop, receiptFooter: e.target.value })} /></div>
+        </div>
+
+        <div>
+          <div className="card" style={{ marginBottom: 14 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}>👥 Manajemen Staff</h3>
+            {users.map((u) => (
+              <div key={u.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, background: "var(--bg2)", borderRadius: 8, marginBottom: 6 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{u.name}</div>
+                  <div style={{ fontSize: 10, color: "var(--txt3)" }}>@{u.username} • {u.role}</div>
+                </div>
+                <span className="bdg" style={{ background: u.active ? "rgba(16,185,129,0.2)" : "var(--panel2)", color: u.active ? "var(--ok)" : "var(--txt3)" }}>
+                  {u.active ? "Aktif" : "Nonaktif"}
+                </span>
+              </div>
+            ))}
+            <button className="btn gh" style={{ width: "100%", justifyContent: "center", marginTop: 10 }} onClick={() => { setEditUser(null); setShowUserMod(true); }}><Ic n="plus" s={14} /> Tambah Staff</button>
+          </div>
+
+          <div className="card" style={{ marginBottom: 14 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}><Ic n="bell" s={16} /> Notifikasi Email Otomatis</h3>
+            <p style={{ fontSize: 12, color: "var(--txt2)", marginBottom: 10 }}>Kirim ringkasan harian ke email setiap jam 8 pagi (stok rendah & servis pending &gt;3 hari).</p>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: 10, background: "var(--bg2)", borderRadius: 8 }}>
+              <input type="checkbox" checked={shop.emailNotif || false} onChange={(e) => setShop({ ...shop, emailNotif: e.target.checked })} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Aktifkan notifikasi email harian</span>
+            </label>
+          </div>
+
+          <div className="card" style={{ borderColor: "rgba(239,68,68,0.3)" }}>
+            <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 10, color: "var(--err)" }}>⚠️ Reset Data</h3>
+            <p style={{ fontSize: 12, color: "var(--txt2)", marginBottom: 10 }}>Hapus semua data lokal. Tidak dapat dikembalikan.</p>
+            <button className="btn err" onClick={() => {
+              if (confirm("Yakin reset semua data?")) {
+                ["sk2_tickets", "sk2_sales", "sk2_customers", "sk2_technicians", "sk2_products", "sk2_suppliers", "sk2_purchases", "sk2_users", "sk2_branch", "sk2_shop", "sk2_page", "sk2_user", "sk2_theme", "sk2_collapsed"].forEach((k) => localStorage.removeItem(k));
+                location.reload();
+              }
+            }}><Ic n="trash" /> Reset Semua Data</button>
+          </div>
+        </div>
+      </div>
+
+      {showUserMod && <UserFormModal user={editUser} onClose={() => setShowUserMod(false)} onSave={(u) => {
+        if (editUser) setUsers(users.map((x) => x.id === u.id ? u : x));
+        else setUsers([...users, { ...u, id: gid("USR") }]);
+        setShowUserMod(false);
+      }} />}
+    </div>
+  );
+};
+
+const UserFormModal = ({ user, onClose, onSave }) => {
+  const [f, setF] = useState(user || { username: "", password: "", name: "", role: "STAFF", active: true, branch: "b1" });
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="mbox" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+        <div className="mhd"><h3>{user ? "Edit" : "Tambah"} Staff</h3><button className="close" onClick={onClose}><Ic n="x" /></button></div>
+        <div className="mbd">
+          <div className="fld"><label>Nama</label><input className="inp" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
+          <div className="row">
+            <div className="fld"><label>Username</label><input className="inp" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} /></div>
+            <div className="fld"><label>Password</label><input className="inp" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></div>
+          </div>
+          <div className="row">
+            <div className="fld">
+              <label>Role</label>
+              <select className="sel" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>
+                <option>OWNER</option><option>ADMIN</option><option>KASIR</option><option>TEKNISI</option>
+              </select>
+            </div>
+            <div className="fld">
+              <label>Cabang</label>
+              <select className="sel" value={f.branch} onChange={(e) => setF({ ...f, branch: e.target.value })}>
+                <option value="all">Semua</option>
+                {BRANCHES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div className="mft"><button className="btn gh" onClick={onClose}>Batal</button><button className="btn pri" onClick={() => onSave(f)}><Ic n="check" /> Simpan</button></div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================================================
+// ROOT
+// ==========================================================================
+export default function App() {
+  const [user, setUser] = useLS("sk2_user", null);
+  const [users, setUsers] = useLS("sk2_users", INIT_USERS);
+  const [page, setPage] = useLS("sk2_page", "dash");
+  const [branch, setBranch] = useLS("sk2_branch", "b1");
+  const [theme, setTheme] = useLS("sk2_theme", "dark");
+  const [collapsed, setCollapsed] = useLS("sk2_collapsed", false);
+  const [tickets, setTickets] = useLS("sk2_tickets", INIT_TICKETS);
+  const [sales, setSales] = useLS("sk2_sales", INIT_SALES);
+  const [customers, setCustomers] = useLS("sk2_customers", INIT_CUSTOMERS);
+  const [technicians, setTechnicians] = useLS("sk2_technicians", INIT_TECHNICIANS);
+  const [products, setProducts] = useLS("sk2_products", INIT_PRODUCTS);
+  const [suppliers, setSuppliers] = useLS("sk2_suppliers", INIT_SUPPLIERS);
+  const [purchases, setPurchases] = useLS("sk2_purchases", INIT_PURCHASES);
+  const [shop, setShop] = useLS("sk2_shop", {
+    name: "MAX Mobile Service", tagline: "Servis HP, Tablet & Laptop Terpercaya",
+    waCS: "081234567890", email: "cs@maxmobile.id",
+    address: "Jl. Margonda Raya No. 12, Depok",
+    receiptFooter: "Terima kasih atas kunjungan Anda!",
+    emailNotif: false,
+  });
+  const [branchModal, setBranchModal] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [showNewTicket, setShowNewTicket] = useState(null); // null | "normal" | "kilat"
+
+  useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
+
+  if (!user) return <><style>{CSS}</style><LoginPage users={users} onLogin={setUser} /></>;
+
+  const titles = {
+    dash: ["Dashboard", `${BRANCHES.find(b => b.id === branch)?.name}`],
+    pos: ["Kasir (POS)", "Transaksi penjualan produk"],
+    ticket: ["Manajemen Servis", "Kelola tiket perbaikan"],
+    kilat: ["Servis Kilat", "Tiket prioritas express"],
+    inv: ["Inventaris", "Manajemen stok produk"],
+    supplier: ["Supplier", "Daftar supplier"],
+    cust: ["Pelanggan", "Database & histori"],
+    tech: ["Teknisi", "Performa & manajemen"],
+    history: ["Riwayat Transaksi", "Penjualan & servis selesai"],
+    report: ["Laporan", "Analisis bisnis"],
+    track: ["Tracking Publik", "Cek status tiket customer"],
+    setting: ["Pengaturan", "Konfigurasi aplikasi"],
+  };
+  const [t, s] = titles[page] || ["-", ""];
+
+  const actions = page === "ticket" ? <button className="btn pri" onClick={() => setShowNewTicket("normal")}><Ic n="plus" s={14} /> Terima Servis</button>
+    : page === "kilat" ? <button className="btn pri" onClick={() => setShowNewTicket("kilat")}><Ic n="bolt" s={14} /> Servis Kilat</button>
+    : null;
+
+  return (
+    <>
+      <style>{CSS}</style>
+      <div className="app">
+        <Sidebar page={page} setPage={setPage} branch={branch} setBranchModal={setBranchModal} user={user} onLogout={() => setUser(null)} collapsed={collapsed} />
+        <div className="main">
+          <TopBar title={t} subtitle={s} actions={actions} onCollapse={() => setCollapsed(!collapsed)} theme={theme} setTheme={setTheme} />
+          {page === "dash" && <DashboardPage tickets={tickets} sales={sales} technicians={technicians} products={products} branch={branch} user={user} setPage={setPage} />}
+          {page === "pos" && <POSPage products={products} setProducts={setProducts} sales={sales} setSales={setSales} customers={customers} branch={branch} user={user} shop={shop} />}
+          {page === "ticket" && <TicketPage tickets={tickets} setTickets={setTickets} technicians={technicians} branch={branch} setSelected={setSelected} />}
+          {page === "kilat" && <TicketPage tickets={tickets} setTickets={setTickets} technicians={technicians} branch={branch} setSelected={setSelected} kilatOnly />}
+          {page === "inv" && <InventoryPage products={products} setProducts={setProducts} suppliers={suppliers} purchases={purchases} setPurchases={setPurchases} />}
+          {page === "supplier" && <div className="cnt"><SupplierModal suppliers={suppliers} onClose={() => setPage("dash")} /></div>}
+          {page === "cust" && <CustomerPage customers={customers} setCustomers={setCustomers} tickets={tickets} />}
+          {page === "tech" && <TechnicianPage technicians={technicians} tickets={tickets} branch={branch} />}
+          {page === "history" && <HistoryPage tickets={tickets} sales={sales} branch={branch} shop={shop} />}
+          {page === "report" && <ReportPage tickets={tickets} sales={sales} products={products} technicians={technicians} branch={branch} />}
+          {page === "track" && <TrackingPage tickets={tickets} />}
+          {page === "setting" && <SettingPage shop={shop} setShop={setShop} users={users} setUsers={setUsers} />}
+        </div>
+        {branchModal && <BranchModal onClose={() => setBranchModal(false)} current={branch} setBranch={setBranch} />}
+        {selected && <TicketDetail ticket={selected} setTickets={setTickets} technicians={technicians} onClose={() => setSelected(null)} shop={shop} />}
+        {showNewTicket && <NewTicketModal onClose={(t) => { setShowNewTicket(null); if (t) setSelected(t); }} setTickets={setTickets} customers={customers} setCustomers={setCustomers} technicians={technicians} branch={branch} kilat={showNewTicket === "kilat"} />}
+      </div>
+    </>
+  );
 }
