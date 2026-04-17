@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import logoImg from "./assets/logo.jpeg";
 
 // ==========================================================================
 // SERVISKITA PRO v2.0 — Service Management + POS Multi-Cabang Enterprise
@@ -508,9 +509,9 @@ const LoginPage = ({ users, onLogin }) => {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <div className="login-logo">🛠️</div>
+        <div style={{width:120,height:68,borderRadius:14,overflow:"hidden",margin:"0 auto 12px",boxShadow:"0 8px 30px rgba(56,189,248,0.3)",border:"1.5px solid rgba(56,189,248,0.2)"}}><img src={logoImg} alt="MAX Mobile" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></div>
         <h1>MAX Mobile Service</h1>
-        <p className="sub">Sistem Manajemen Servis & Point of Sale</p>
+        <p className="sub">Apple & Android — Service Management & POS</p>
         <div className="fld">
           <label>Username</label>
           <input className="inp" value={u} onChange={(e) => { setU(e.target.value); setErr(""); }} placeholder="Masukkan username" onKeyDown={(e) => e.key === "Enter" && submit()} />
@@ -560,10 +561,10 @@ const Sidebar = ({ page, setPage, branch, setBranchModal, user, onLogout, collap
   return (
     <aside className={`sb ${collapsed ? "col" : ""}`}>
       <div className="brand">
-        <div className="logo">🛠️</div>
+        <div style={{width:40,height:34,borderRadius:8,overflow:"hidden",flexShrink:0,border:"1px solid rgba(56,189,248,0.25)",boxShadow:"0 2px 10px rgba(56,189,248,0.2)"}}><img src={logoImg} alt="MAX" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></div>
         <div className="brand-txt">
-          <h1>MAX Mobile Service</h1>
-          <p>v2.0 Enterprise</p>
+          <h1>MAX Mobile</h1>
+          <p>Apple & Android Service</p>
         </div>
       </div>
       <nav className="nav">
