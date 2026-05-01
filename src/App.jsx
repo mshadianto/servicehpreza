@@ -991,6 +991,8 @@ const InvoiceModal = ({ ticket: t, shop, technicians, onClose }) => {
   const lunas = (Number(t.sisa) || 0) <= 0 && (Number(t.totalCost) || 0) > 0;
   const handlePrint = () => window.print();
 
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=4&data=${encodeURIComponent(trackUrl)}`;
+
   const buildText = () => {
     const L = [];
     L.push("*FAKTUR ELEKTRONIK SERVIS*");
@@ -1050,6 +1052,7 @@ const InvoiceModal = ({ ticket: t, shop, technicians, onClose }) => {
         <div className="mbd">
           <div className="receipt" style={{ maxWidth: 360 }}>
             <div className="hd">
+              <img src={logoImg} alt="logo" style={{ width: 56, height: 56, objectFit: "contain", margin: "0 auto 6px", display: "block", borderRadius: 6 }} />
               <h3>FAKTUR ELEKTRONIK SERVIS</h3>
               <div style={{ fontWeight: 700 }}>{shop.name}</div>
               {b?.name && <div>{b.name}</div>}
@@ -1138,9 +1141,10 @@ const InvoiceModal = ({ ticket: t, shop, technicians, onClose }) => {
             </div>
 
             <div className="div" />
-            <div style={{ fontSize: 10, wordBreak: "break-all", textAlign: "center" }}>
-              Lacak status servis:<br />
-              {trackUrl}
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>📲 Scan untuk lacak status</div>
+              <img src={qrUrl} alt="QR Track" style={{ width: 120, height: 120, margin: "4px auto", display: "block", border: "1px solid #ccc" }} />
+              <div style={{ fontSize: 9, wordBreak: "break-all", marginTop: 4 }}>{trackUrl}</div>
             </div>
             <div className="ft">{shop.receiptFooter || "Terima kasih"}</div>
           </div>
@@ -1804,11 +1808,22 @@ const KulakanModal = ({ products, setProducts, suppliers, purchases, setPurchase
 const TrackingPage = ({ tickets }) => {
   const [q, setQ] = useState("");
   const [found, setFound] = useState(null);
-  const track = () => {
-    const t = tickets.find((x) => x.id.toLowerCase() === q.trim().toLowerCase());
+  const track = (resi) => {
+    const target = (resi ?? q).trim().toLowerCase();
+    if (!target) return;
+    const t = tickets.find((x) => x.id.toLowerCase() === target);
     if (t) setFound(t);
     else { alert("Resi tidak ditemukan"); setFound(null); }
   };
+  useEffect(() => {
+    const h = window.location.hash || "";
+    const m = h.match(/#track-([A-Za-z0-9]+)/);
+    if (m && m[1]) {
+      setQ(m[1].toUpperCase());
+      const found = tickets.find((x) => x.id.toLowerCase() === m[1].toLowerCase());
+      if (found) setFound(found);
+    }
+  }, [tickets]);
   const statusFlow = ["masuk", "antri", "diagnosa", "menunggu", "repair", "selesai", "ambil"];
   const curIdx = found ? statusFlow.indexOf(found.status) : -1;
 
@@ -1820,7 +1835,7 @@ const TrackingPage = ({ tickets }) => {
         <p style={{ fontSize: 13, color: "var(--txt2)", marginTop: 6 }}>Masukkan nomor resi untuk melihat progres</p>
         <div style={{ display: "flex", gap: 8, marginTop: 18, maxWidth: 420, margin: "18px auto 0" }}>
           <input className="inp" placeholder="Contoh: GK4PLLCMYL" value={q} onChange={(e) => setQ(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && track()} />
-          <button className="btn pri" onClick={track}><Ic n="search" /> Lacak</button>
+          <button className="btn pri" onClick={() => track()}><Ic n="search" /> Lacak</button>
         </div>
       </div>
 
