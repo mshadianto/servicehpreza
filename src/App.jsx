@@ -1061,8 +1061,18 @@ const NewTicketModal = ({ onClose, setTickets, customers, setCustomers, technici
     if (exists) upd("services", form.services.filter((s) => s.id !== svc.id));
     else upd("services", [...form.services, { id: svc.id, name: svc.name, price: svc.price }]);
   };
+  const updateServicePrice = (id, price) =>
+    upd("services", form.services.map((s) => s.id === id ? { ...s, price: Number(price) || 0 } : s));
+  const addPart = () =>
+    upd("parts", [...form.parts, { id: `m${Date.now()}`, name: "", qty: 1, price: 0 }]);
+  const updatePart = (id, k, v) =>
+    upd("parts", form.parts.map((p) => p.id === id ? { ...p, [k]: v } : p));
+  const removePart = (id) =>
+    upd("parts", form.parts.filter((p) => p.id !== id));
 
-  const total = form.services.reduce((s, x) => s + x.price, 0) + form.parts.reduce((s, x) => s + x.price, 0);
+  const total =
+    form.services.reduce((s, x) => s + (Number(x.price) || 0), 0) +
+    form.parts.reduce((s, x) => s + (Number(x.price) || 0) * (Number(x.qty) || 1), 0);
 
   const submit = () => {
     if (!form.custName || !form.custPhone || !form.complaint) {
@@ -1168,6 +1178,35 @@ const NewTicketModal = ({ onClose, setTickets, customers, setCustomers, technici
                   })}
                 </div>
               </div>
+
+              {(form.services.length > 0 || form.parts.length > 0) && (
+                <div className="fld" style={{ marginTop: 14 }}>
+                  <label>Daftar Servis & Barang (harga bisa diedit manual)</label>
+                  <div style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 10, background: "var(--bg2)" }}>
+                    {form.services.map((s) => (
+                      <div key={s.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: "1px dashed var(--line)" }}>
+                        <span style={{ fontSize: 12, flex: 1 }}>🔧 {s.name}</span>
+                        <input type="number" className="inp" value={s.price} onChange={(e) => updateServicePrice(s.id, e.target.value)} style={{ width: 130, padding: 6 }} placeholder="Harga" />
+                        <button className="btn sm gh" onClick={() => toggleService(s)} title="Hapus"><Ic n="x" s={12} /></button>
+                      </div>
+                    ))}
+                    {form.parts.map((p) => (
+                      <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: "1px dashed var(--line)" }}>
+                        <input className="inp" placeholder="Nama barang / spare part" value={p.name} onChange={(e) => updatePart(p.id, "name", e.target.value)} style={{ flex: 1, padding: 6 }} />
+                        <input type="number" className="inp" value={p.qty} onChange={(e) => updatePart(p.id, "qty", Number(e.target.value) || 1)} style={{ width: 60, padding: 6 }} title="Qty" />
+                        <input type="number" className="inp" value={p.price} onChange={(e) => updatePart(p.id, "price", Number(e.target.value) || 0)} style={{ width: 130, padding: 6 }} placeholder="Harga" />
+                        <button className="btn sm gh" onClick={() => removePart(p.id)} title="Hapus"><Ic n="x" s={12} /></button>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 6, fontWeight: 800 }}>
+                      <span style={{ fontSize: 12 }}>SUBTOTAL</span>
+                      <span style={{ color: "var(--pri)", fontSize: 14 }}>{rp(total)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <button className="btn sm gh" style={{ marginTop: 8 }} onClick={addPart}><Ic n="plus" s={12} /> Tambah Barang Manual</button>
+
               <div className="row" style={{ marginTop: 14 }}>
                 <div className="fld">
                   <label>Assign Teknisi</label>
@@ -1197,10 +1236,13 @@ const NewTicketModal = ({ onClose, setTickets, customers, setCustomers, technici
                 <div style={{ fontSize: 12, color: "var(--txt2)", marginTop: 4 }}>📞 {form.custPhone}</div>
               </div>
               <div style={{ padding: 14, background: "var(--bg2)", borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>Servis</div>
-                {form.services.length === 0 ? <div style={{ fontSize: 12, color: "var(--txt3)" }}>Belum ada servis</div>
-                  : form.services.map((s) => <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}><span style={{ fontSize: 13 }}>{s.name}</span><span style={{ fontSize: 13 }}>{rp(s.price)}</span></div>)
-                }
+                <div style={{ fontSize: 10, color: "var(--txt3)", textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>Servis & Barang</div>
+                {form.services.length === 0 && form.parts.length === 0 ? <div style={{ fontSize: 12, color: "var(--txt3)" }}>Belum ada servis</div> : (
+                  <>
+                    {form.services.map((s) => <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}><span style={{ fontSize: 13 }}>🔧 {s.name}</span><span style={{ fontSize: 13 }}>{rp(s.price)}</span></div>)}
+                    {form.parts.map((p) => <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}><span style={{ fontSize: 13 }}>📦 {p.name || "(tanpa nama)"}{p.qty > 1 ? ` × ${p.qty}` : ""}</span><span style={{ fontSize: 13 }}>{rp((Number(p.price) || 0) * (Number(p.qty) || 1))}</span></div>)}
+                  </>
+                )}
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--pri)", fontWeight: 800 }}>
                   <span>TOTAL</span><span style={{ color: "var(--pri)", fontSize: 16 }}>{rp(total)}</span>
                 </div>
