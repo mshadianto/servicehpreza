@@ -982,6 +982,178 @@ const ReceiptModal = ({ sale, shop, branch, onClose }) => {
   );
 };
 
+// ---------- INVOICE MODAL (Faktur Elektronik Servis) ----------
+const InvoiceModal = ({ ticket: t, shop, technicians, onClose }) => {
+  const b = BRANCHES.find((x) => x.id === t.branch);
+  const dev = DEVICE_TYPES.find((d) => d.id === t.device);
+  const tech = technicians.find((x) => x.id === t.technicianId);
+  const trackUrl = `${window.location.origin}${window.location.pathname}#track-${t.id}`;
+  const lunas = (Number(t.sisa) || 0) <= 0 && (Number(t.totalCost) || 0) > 0;
+  const handlePrint = () => window.print();
+
+  const buildText = () => {
+    const L = [];
+    L.push("*FAKTUR ELEKTRONIK SERVIS*");
+    L.push(shop.name);
+    if (b?.addr) L.push(b.addr);
+    L.push("WA: " + shop.waCS);
+    L.push("");
+    L.push("Nomor Nota : " + t.id);
+    L.push("Pelanggan  : " + t.custName);
+    L.push("No HP      : " + t.custPhone);
+    L.push("Terima     : " + fFull(t.createdAt));
+    if (t.estDone) L.push("Estimasi   : " + t.estDone);
+    L.push("");
+    L.push("=== PERANGKAT ===");
+    L.push((dev?.icon || "") + " " + [t.brand, t.model].filter(Boolean).join(" "));
+    if (t.imei) L.push("IMEI: " + t.imei);
+    if (t.color) L.push("Warna: " + t.color);
+    if (t.accessories) L.push("Aksesoris: " + t.accessories);
+    L.push("Keluhan: " + (t.complaint || "-"));
+    if (t.diagnosis) L.push("Diagnosa: " + t.diagnosis);
+    L.push("");
+    L.push("=== DETAIL BIAYA ===");
+    if (t.services?.length) {
+      L.push("Servis:");
+      t.services.forEach((s) => L.push("  ✅ " + s.name + " — " + rp(s.price)));
+    }
+    if (t.parts?.length) {
+      L.push("Barang / Spare Part:");
+      t.parts.forEach((p) => {
+        const qty = Number(p.qty) || 1;
+        const sub = (Number(p.price) || 0) * qty;
+        L.push("  📦 " + (p.name || "-") + (qty > 1 ? " ×" + qty : "") + " — " + rp(sub));
+      });
+    }
+    L.push("");
+    L.push("Total tagihan : " + rp(t.totalCost));
+    L.push("Grand total   : " + rp(t.totalCost));
+    if (t.dp > 0) {
+      L.push("DP / Bayar    : " + rp(t.dp));
+      L.push("Sisa tagihan  : " + rp(t.sisa));
+    }
+    L.push("Status        : " + (lunas ? "LUNAS ✅" : "BELUM LUNAS"));
+    L.push("Garansi       : " + t.warranty + " hari");
+    if (tech?.name) L.push("Teknisi       : " + tech.name);
+    L.push("");
+    L.push("Lacak status:");
+    L.push(trackUrl);
+    L.push("");
+    L.push("Terima kasih 🙏");
+    return L.join("\n");
+  };
+
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="mbox" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+        <div className="mhd"><h3>📄 Faktur Servis</h3><button className="close" onClick={onClose}><Ic n="x" /></button></div>
+        <div className="mbd">
+          <div className="receipt" style={{ maxWidth: 360 }}>
+            <div className="hd">
+              <h3>FAKTUR ELEKTRONIK SERVIS</h3>
+              <div style={{ fontWeight: 700 }}>{shop.name}</div>
+              {b?.name && <div>{b.name}</div>}
+              {b?.addr && <div>{b.addr}</div>}
+              <div>WA: {shop.waCS}</div>
+            </div>
+
+            <div className="ln"><span>Nomor Nota:</span><span style={{ fontWeight: 700 }}>{t.id}</span></div>
+            <div className="ln"><span>Pelanggan:</span><span>{t.custName}</span></div>
+            <div className="ln"><span>No HP:</span><span>{t.custPhone}</span></div>
+            <div className="ln"><span>Terima:</span><span>{fFull(t.createdAt)}</span></div>
+            {t.estDone && <div className="ln"><span>Estimasi:</span><span>{t.estDone}</span></div>}
+
+            <div className="div" />
+            <div style={{ fontWeight: 800, marginBottom: 4 }}>PERANGKAT</div>
+            <div>{dev?.icon} {t.brand} {t.model}</div>
+            {t.imei && <div className="ln"><span>IMEI:</span><span>{t.imei}</span></div>}
+            {t.color && <div className="ln"><span>Warna:</span><span>{t.color}</span></div>}
+            {t.accessories && <div className="ln"><span>Aksesoris:</span><span>{t.accessories}</span></div>}
+            {t.kilat && <div style={{ fontWeight: 800, marginTop: 4 }}>⚡ SERVIS KILAT</div>}
+
+            <div className="div" />
+            <div style={{ fontWeight: 800, marginBottom: 4 }}>KELUHAN</div>
+            <div>{t.complaint || "-"}</div>
+            {t.diagnosis && (
+              <>
+                <div style={{ fontWeight: 800, marginTop: 6, marginBottom: 4 }}>DIAGNOSA</div>
+                <div>{t.diagnosis}</div>
+              </>
+            )}
+
+            <div className="div" />
+            <div style={{ fontWeight: 800, marginBottom: 4 }}>DETAIL BIAYA</div>
+            {t.services?.length > 0 && (
+              <>
+                <div style={{ fontWeight: 700, marginTop: 2 }}>Layanan / Servis:</div>
+                {t.services.map((s) => (
+                  <div key={s.id}>
+                    <div>✅ {s.name}</div>
+                    <div className="ln"><span>&nbsp;&nbsp;&nbsp;@ {rp(s.price)}</span><span>{rp(s.price)}</span></div>
+                  </div>
+                ))}
+              </>
+            )}
+            {t.parts?.length > 0 && (
+              <>
+                <div style={{ fontWeight: 700, marginTop: 4 }}>Barang / Spare Part:</div>
+                {t.parts.map((p) => {
+                  const qty = Number(p.qty) || 1;
+                  const price = Number(p.price) || 0;
+                  return (
+                    <div key={p.id}>
+                      <div>📦 {p.name || "(tanpa nama)"}</div>
+                      <div className="ln"><span>&nbsp;&nbsp;&nbsp;{qty} × {rp(price)}</span><span>{rp(qty * price)}</span></div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            <div className="div" />
+            <div className="ln" style={{ fontWeight: 800 }}><span>Total tagihan</span><span>{rp(t.totalCost)}</span></div>
+            <div className="ln" style={{ fontWeight: 800, fontSize: 13 }}><span>Grand total</span><span>{rp(t.totalCost)}</span></div>
+            {t.dp > 0 && (
+              <>
+                <div className="ln"><span>DP / Bayar Awal</span><span>{rp(t.dp)}</span></div>
+                <div className="ln" style={{ fontWeight: 700 }}><span>Sisa tagihan</span><span>{rp(t.sisa)}</span></div>
+              </>
+            )}
+            <div className="ln" style={{ fontWeight: 800, marginTop: 4 }}>
+              <span>Status</span>
+              <span style={{ color: lunas ? "#16a34a" : "#dc2626" }}>{lunas ? "LUNAS" : "BELUM LUNAS"}</span>
+            </div>
+            <div className="ln"><span>Garansi</span><span>{t.warranty} hari</span></div>
+            {tech?.name && <div className="ln"><span>Teknisi</span><span>{tech.name}</span></div>}
+
+            <div className="div" />
+            <div style={{ fontWeight: 800, marginBottom: 4 }}>SYARAT &amp; KETENTUAN</div>
+            <div style={{ fontSize: 10, lineHeight: 1.5 }}>
+              1. Pengambilan perangkat wajib menunjukkan nota / resi ini.<br />
+              2. Perangkat yang tidak diambil &gt; 1 bulan dianggap hilang dan tidak diganti.<br />
+              3. Garansi servis berlaku {t.warranty} hari hanya untuk komponen yang diservis.<br />
+              4. Garansi gugur jika ada bekas servis pihak lain, segel rusak, atau kerusakan akibat pemakaian.<br />
+              5. Klaim garansi wajib menunjukkan nota ini.<br />
+              6. Setiap konsumen dianggap setuju dengan isi nota ini.
+            </div>
+
+            <div className="div" />
+            <div style={{ fontSize: 10, wordBreak: "break-all", textAlign: "center" }}>
+              Lacak status servis:<br />
+              {trackUrl}
+            </div>
+            <div className="ft">{shop.receiptFooter || "Terima kasih"}</div>
+          </div>
+        </div>
+        <div className="mft">
+          <button className="btn wa" onClick={() => window.open(waLink(t.custPhone, buildText()), "_blank")}><Ic n="wa" /> Kirim WA</button>
+          <button className="btn pri" onClick={handlePrint}><Ic n="print" /> Cetak</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ---------- TIKET LIST ----------
 const TicketPage = ({ tickets, setTickets, technicians, branch, setSelected, setPage, kilatOnly = false }) => {
   const [q, setQ] = useState("");
@@ -1265,6 +1437,7 @@ const NewTicketModal = ({ onClose, setTickets, customers, setCustomers, technici
 const TicketDetail = ({ ticket, setTickets, technicians, onClose, shop }) => {
   const [t, setT] = useState(ticket);
   const [diagMode, setDiagMode] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
   const tech = technicians.find((x) => x.id === t.technicianId);
   const dev = DEVICE_TYPES.find((d) => d.id === t.device);
 
@@ -1389,9 +1562,11 @@ const TicketDetail = ({ ticket, setTickets, technicians, onClose, shop }) => {
         </div>
         <div className="mft">
           <button className="btn gh" onClick={() => window.print()}><Ic n="print" /> Print</button>
+          <button className="btn ok" onClick={() => setShowInvoice(true)}>📄 Faktur</button>
           <button className="btn pri" onClick={onClose}>Tutup</button>
         </div>
       </div>
+      {showInvoice && <InvoiceModal ticket={t} shop={shop} technicians={technicians} onClose={() => setShowInvoice(false)} />}
     </div>
   );
 };
